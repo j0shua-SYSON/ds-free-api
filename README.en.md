@@ -64,25 +64,19 @@ The `config/` and `data/` directories are bind-mounted into the container — co
 All accounts use password `test12345`:
 
 ```text
-amzhoxvzidbke+castaneda@gmail.com
-veritastollonics+kincaid@gmail.com
-debatefeatgdcdve+mccutcheon@gmail.com
-sksjhsmshsmsnbv+ritter@gmail.com
-slsnvskshevvekeb+kenny@gmail.com
-slsnvskshevvekeb+halcomb@gmail.com
-wkwjhskssksbg+calloway@gmail.com
-vsigsiehvdidod+oden@gmail.com
-faceliftery+redding@gmail.com
-tayahschwarz257+choate@gmail.com
-dishdeifybkaoup+geer@gmail.com
-debatefeatgdcdve+keenan@gmail.com
-arrogancepchzxp+true@gmail.com
-arrogancepchzxp+shipley@gmail.com
-tayahschwarz257+bourque@gmail.com
+debatefeatgdcdve+mclendon@gmail.com
+t.a.ya.hs.c.h.war.z2.5.7@gmail.com
+vsigsiehvdidod+hewitt@gmail.com
+sks.j.hsms.h.sms.n.bv@gmail.com
+slsnvskshevvekeb+berg@gmail.com
+v.s.i.gs.i.ehv.di.d.o.d@gmail.com
+slsnvskshevvekeb+christie@gmail.com
+wa.sh.brom.a.i.1.9.1@gmail.com
 ```
 
-> 💡 Use [emailtick.com](https://www.emailtick.com/en)'s **alias addresses** to quickly create unlimited temporary Gmail accounts; format is `username+anytag@gmail.com`, and emails still go to your original Gmail inbox.
+> 💡 Use [emailtick.com](https://www.emailtick.com/en) to quickly create unlimited temporary Gmail accounts.
 > When test accounts get banned, register new ones and replace them.
+> From [issue #62](https://github.com/NIyueeE/ds-free-api/issues/62)
 
 
 ## API Endpoints

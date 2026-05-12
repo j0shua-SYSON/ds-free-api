@@ -65,25 +65,19 @@ docker compose -f docker-compose.yaml up -d
 以下账号密码统一为 `test12345`：
 
 ```text
-amzhoxvzidbke+castaneda@gmail.com
-veritastollonics+kincaid@gmail.com
-debatefeatgdcdve+mccutcheon@gmail.com
-sksjhsmshsmsnbv+ritter@gmail.com
-slsnvskshevvekeb+kenny@gmail.com
-slsnvskshevvekeb+halcomb@gmail.com
-wkwjhskssksbg+calloway@gmail.com
-vsigsiehvdidod+oden@gmail.com
-faceliftery+redding@gmail.com
-tayahschwarz257+choate@gmail.com
-dishdeifybkaoup+geer@gmail.com
-debatefeatgdcdve+keenan@gmail.com
-arrogancepchzxp+true@gmail.com
-arrogancepchzxp+shipley@gmail.com
-tayahschwarz257+bourque@gmail.com
+debatefeatgdcdve+mclendon@gmail.com
+t.a.ya.hs.c.h.war.z2.5.7@gmail.com
+vsigsiehvdidod+hewitt@gmail.com
+sks.j.hsms.h.sms.n.bv@gmail.com
+slsnvskshevvekeb+berg@gmail.com
+v.s.i.gs.i.ehv.di.d.o.d@gmail.com
+slsnvskshevvekeb+christie@gmail.com
+wa.sh.brom.a.i.1.9.1@gmail.com
 ```
 
-> 💡 使用 [emailtick.com](https://www.emailtick.com/zh) 的**别名地址**可快速创建无限数量的 Gmail 临时账号；格式为 `用户名+任意标签@gmail.com`，邮件仍会投递到原始 Gmail 收件箱。
+> 💡 使用 [emailtick.com](https://www.emailtick.com/zh) 可快速创建无限数量的 Gmail 临时账号；
 > 测试账号被封后可自行注册替换。
+> 来自[issue #62](https://github.com/NIyueeE/ds-free-api/issues/62)
 
 ## API 端点
 
