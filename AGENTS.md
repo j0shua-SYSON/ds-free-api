@@ -95,8 +95,8 @@ src/
 - `examples/adapter_cli.rs` + `examples/adapter_cli/` — debug CLI + JSON request samples
 - `py-e2e-tests/` — Python e2e test suite (uv-managed, JSON-driven scenarios)
 - `docker/Dockerfile` + `docker/docker-compose.yaml` — Docker deployment (ghcr.io image)
-- `docs/` — `code-style.md`（代码注释、命名、错误消息约定），`logging-spec.md`（日志级别、target、模块级过滤），`deepseek-prompt-injection.md`（DeepSeek 原生标签、工具调用注入策略），`development.md`（环境配置、首次启动、Release 构建）
-- `ds_core/raw-api-reference.md` — DeepSeek 后端 API 参考（端点、信封格式、SSE 增量协议、PoW、WAF 绕过）
+- `docs/` — `code-style.md` (comment style, naming, error message conventions), `logging-spec.md` (log levels, targets, module-level filtering), `deepseek-prompt-injection.md` (DeepSeek native tokens, tool call injection strategy), `development.md` (environment setup, first run, release build)
+- `ds_core/raw-api-reference.md` — DeepSeek backend API reference (endpoints, envelope format, SSE delta protocol, PoW, WAF bypass)
 
 ### Binary / Library Split
 
@@ -226,7 +226,7 @@ Each account retries 3x with 2s delay on failure. If an account fails all retrie
 
 `v0_chat()` → `get_account()` → `split_history()` → `create_session()` → `upload_files()` → `compute_pow()` → `completion()` → `parse_ready()` → `GuardedStream`
 
-Each `v0_chat()` call creates a dedicated session, uploads multi-turn history as files, then streams the response. The response is a `StreamEvent` stream (not raw SSE bytes) — the new **精简响应协议** abstracts away DeepSeek's p/o/v patch protocol into typed events: `Meta`, `ThinkStart`, `ThinkDelta`, `ContentStart`, `ContentDelta`, `Done`. The session is destroyed when the stream ends via `GuardedStream::drop`, which also calls `stop_stream` on abnormal disconnects. Sessions are tracked in `active_sessions: Arc<Mutex<HashMap<String, ActiveSession>>>`.
+Each `v0_chat()` call creates a dedicated session, uploads multi-turn history as files, then streams the response. The response is a `StreamEvent` stream (not raw SSE bytes) — the new **streamlined response protocol** abstracts away DeepSeek's p/o/v patch protocol into typed events: `Meta`, `ThinkStart`, `ThinkDelta`, `ContentStart`, `ContentDelta`, `Done`. The session is destroyed when the stream ends via `GuardedStream::drop`, which also calls `stop_stream` on abnormal disconnects. Sessions are tracked in `active_sessions: Arc<Mutex<HashMap<String, ActiveSession>>>`.
 
 The `Chat` module dispatches across 3 request paths based on prompt size:
 - **Normal path** (`v0_chat_once`): prompt fits within model limit, sent directly
@@ -246,7 +246,8 @@ ChatCompletionsRequest
   → resolver::resolve|
   → try_chat (ds_core::ChatRequest)
   → if req.stream → ChatCompletionsResponseChunk | else → ChatCompletionsResponse
-```(tiktoken 计数在 `OpenAIAdapter::chat_completions()` 内联完成，非独立 pipeline 模块)
+```
+(tiktoken counting is inlined in `OpenAIAdapter::chat_completions()`, not a separate pipeline module)
 
 ### Response Pipeline (OpenAI) — Stream Chain
 
@@ -463,11 +464,11 @@ Follow `docs/code-style.md`:
 | e2e scenario test framework | `py-e2e-tests/` | JSON-driven scenarios with checks |
 | CI pipeline | `.github/workflows/ci.yml` | `cargo check + clippy + fmt + audit + machete` + `cargo test` |
 | Release workflow | `.github/workflows/release.yml` | Tag `v*` → 8 targets, 4 platforms, CHANGELOG release |
-| Code style | `docs/code-style.md` | 注释、命名、错误消息约定 |
-| Logging spec | `docs/logging-spec.md` | 日志级别、目标、模块级过滤 |
-| Prompt injection strategy | `docs/deepseek-prompt-injection.md` | DeepSeek 原生标签、工具调用注入策略 |
-| DeepSeek API reference | `ds_core/raw-api-reference.md` | 端点、信封格式、SSE 增量协议、PoW 算法 |
-| Development guide | `docs/development.md` | 环境配置、首次启动、Release 构建 |
+| Code style | `docs/code-style.md` | Comment style, naming, error message conventions |
+| Logging spec | `docs/logging-spec.md` | Log levels, targets, module-level filtering |
+| Prompt injection strategy | `docs/deepseek-prompt-injection.md` | DeepSeek native tokens, tool call injection strategy |
+| DeepSeek API reference | `ds_core/raw-api-reference.md` | Endpoints, envelope format, SSE delta protocol, PoW algorithm |
+| Development guide | `docs/development.md` | Environment setup, first run, release build |
 | Admin panel routes | `src/server/admin.rs` | Setup/login/config/status/stats/models/logs handlers |
 | JWT auth + password | `src/server/auth.rs` | `setup_admin()`/`login_admin()`, JWT sign/verify, login rate limiter |
 | Store manager | `src/server/store.rs` | API key validation, stats persistence, delegates admin/keys to `Config::save()` |
@@ -519,9 +520,9 @@ cargo test
 cargo test --lib
 
 # e2e tests (requires `uv`, server on port 22217)
-just e2e-basic    # Basic: 基础功能测试（OpenAI + Anthropic 双端点）
-just e2e-repair   # Repair: 工具调用损坏修复专项测试
-just e2e-stress   # Stress: 全部场景 × 3 次迭代压测
+just e2e-basic    # Basic: core feature tests (OpenAI + Anthropic both endpoints)
+just e2e-repair   # Repair: tool call malformed-format repair tests
+just e2e-stress   # Stress: all scenarios x 3 iterations
 # See docs/development.md for full e2e CLI parameters (filter, parallel, model, report, etc.)
 
 # Start server with e2e config

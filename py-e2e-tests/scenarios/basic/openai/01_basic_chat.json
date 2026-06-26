@@ -1,5 +1,5 @@
 {
-  "name": "基础对话",
+  "name": "Basic chat",
   "endpoint": "openai",
   "category": "basic",
   "models": ["deepseek-default", "deepseek-expert"],

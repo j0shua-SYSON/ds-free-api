@@ -1,5 +1,5 @@
 {
-  "name": "图片HTTP链接",
+  "name": "Image HTTP URL",
   "endpoint": "openai",
   "category": "basic",
   "models": ["deepseek-default", "deepseek-expert"],

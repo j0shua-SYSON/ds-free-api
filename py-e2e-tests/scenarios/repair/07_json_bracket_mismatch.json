@@ -1,5 +1,5 @@
 {
-  "name": "JSON-括号不匹配",
+  "name": "JSON - bracket mismatch",
   "endpoint": "openai",
   "category": "repair",
   "models": ["deepseek-default", "deepseek-expert"],

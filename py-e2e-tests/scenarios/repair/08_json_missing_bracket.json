@@ -1,5 +1,5 @@
 {
-  "name": "JSON-括号缺失",
+  "name": "JSON - missing bracket",
   "endpoint": "openai",
   "category": "repair",
   "models": ["deepseek-default", "deepseek-expert"],

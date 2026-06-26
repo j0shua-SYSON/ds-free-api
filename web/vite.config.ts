@@ -11,7 +11,7 @@ try {
   const portMatch = configToml.match(/^port\s*=\s*(\d+)/m)
   if (portMatch) backendPort = parseInt(portMatch[1], 10)
 } catch {
-  // config.toml 不存在时使用默认端口
+  // use default port when config.toml does not exist
 }
 
 export default defineConfig({

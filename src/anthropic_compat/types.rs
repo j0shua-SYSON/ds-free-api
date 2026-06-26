@@ -1,7 +1,7 @@
-//! Anthropic Messages API 请求类型定义
+//! Anthropic Messages API request type definitions
 //!
-//! 对齐 Anthropic Messages API 协议，保留全部兼容字段。
-//! 未消费的字段通过 `pub` 字段避免编译器 warning，与 openai_adapter/types.rs 对称。
+//! Aligned with the Anthropic Messages API protocol, retaining all compatible fields.
+//! Unconsumed fields use `pub` visibility to avoid compiler warnings, symmetric with openai_adapter/types.rs.
 
 use bytes::Bytes;
 use log::trace;
@@ -9,10 +9,10 @@ use serde::Deserialize;
 use serde::Serialize;
 
 // ============================================================================
-// 顶层请求
+// Top-level request
 // ============================================================================
 
-/// POST /v1/messages 请求体
+/// POST /v1/messages request body
 #[derive(Debug, Deserialize)]
 pub struct MessagesRequest {
     pub model: String,
@@ -41,11 +41,11 @@ pub struct MessagesRequest {
     pub metadata: Option<Metadata>,
     #[serde(default)]
     pub output_config: Option<OutputConfig>,
-    /// 智能搜索选项（Anthropic 协议扩展字段，映射为 OpenAI web_search_options）
+    /// Web search options (Anthropic protocol extension field, mapped to OpenAI web_search_options)
     #[serde(default)]
     pub web_search_options: Option<serde_json::Value>,
 
-    // 兼容字段：解析但不消费
+    // compatibility fields: parsed but not consumed
     #[serde(default)]
     pub cache_control: Option<CacheControlEphemeral>,
     #[serde(default)]
@@ -55,23 +55,23 @@ pub struct MessagesRequest {
     #[serde(default)]
     pub service_tier: Option<String>,
 
-    // 兜底
+    // fallback
     #[serde(flatten)]
     pub _extra: serde_json::Value,
 }
 
 // ============================================================================
-// 消息
+// Messages
 // ============================================================================
 
-/// 消息参数
+/// Message parameter
 #[derive(Debug, Deserialize, Clone)]
 pub struct MessageParam {
     pub role: String,
     pub content: MessageContent,
 }
 
-/// 消息内容：纯文本或内容块数组
+/// Message content: plain text or content block array
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum MessageContent {
@@ -79,7 +79,7 @@ pub enum MessageContent {
     Blocks(Vec<ContentBlock>),
 }
 
-/// 内容块
+/// Content block
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
@@ -112,12 +112,12 @@ pub enum ContentBlock {
     RedactedThinking {
         data: String,
     },
-    // 其他类型（search_result / server_tool_use 等）直接忽略
+    // Other types (search_result / server_tool_use, etc.) are ignored
     #[serde(other)]
     Other,
 }
 
-/// 图片源
+/// Image source
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum ImageSource {
@@ -127,7 +127,7 @@ pub enum ImageSource {
     Url { url: String },
 }
 
-/// tool_result 内容：字符串或块数组
+/// tool_result content: string or block array
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum ToolResultContent {
@@ -135,7 +135,7 @@ pub enum ToolResultContent {
     Blocks(Vec<ContentBlock>),
 }
 
-/// system 参数：字符串或文本块数组
+/// system parameter: string or text block array
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum SystemContent {
@@ -143,7 +143,7 @@ pub enum SystemContent {
     Blocks(Vec<SystemTextBlock>),
 }
 
-/// system 文本块（仅提取 text，忽略 cache_control / citations）
+/// system text block (extracts text only, ignores cache_control / citations)
 #[derive(Debug, Deserialize, Clone)]
 pub struct SystemTextBlock {
     pub text: String,
@@ -152,10 +152,10 @@ pub struct SystemTextBlock {
 }
 
 // ============================================================================
-// 工具
+// Tools
 // ============================================================================
 
-/// 工具联合类型
+/// Tool union type
 #[derive(Debug, Clone)]
 pub enum ToolUnion {
     Custom {
@@ -164,7 +164,7 @@ pub enum ToolUnion {
         input_schema: serde_json::Value,
         strict: Option<bool>,
     },
-    // 服务器工具（bash / code_execution / web_search 等）忽略
+    // Server tools (bash / code_execution / web_search, etc.) are ignored
     Other,
 }
 
@@ -203,7 +203,7 @@ impl<'de> serde::Deserialize<'de> for ToolUnion {
     }
 }
 
-/// tool_choice 参数
+/// tool_choice parameter
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum ToolChoice {
@@ -228,10 +228,10 @@ pub enum ToolChoice {
 }
 
 // ============================================================================
-// 思考 / 输出控制 / 元数据
+// Thinking / output control / metadata
 // ============================================================================
 
-/// thinking 配置
+/// thinking configuration
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum ThinkingConfig {
@@ -250,14 +250,14 @@ pub enum ThinkingConfig {
     },
 }
 
-/// 请求元数据
+/// Request metadata
 #[derive(Debug, Deserialize, Clone)]
 pub struct Metadata {
     #[serde(default)]
     pub user_id: Option<String>,
 }
 
-/// 输出配置
+/// Output configuration
 #[derive(Debug, Deserialize, Clone)]
 pub struct OutputConfig {
     #[serde(default)]
@@ -266,7 +266,7 @@ pub struct OutputConfig {
     pub format: Option<JsonOutputFormat>,
 }
 
-/// JSON 输出格式
+/// JSON output format
 #[derive(Debug, Deserialize, Clone)]
 pub struct JsonOutputFormat {
     pub schema: serde_json::Value,
@@ -274,7 +274,7 @@ pub struct JsonOutputFormat {
     pub ty: String,
 }
 
-/// cache_control（兼容解析）
+/// cache_control (compatibility parsing)
 #[derive(Debug, Deserialize, Clone)]
 pub struct CacheControlEphemeral {
     #[serde(rename = "type")]
@@ -284,10 +284,10 @@ pub struct CacheControlEphemeral {
 }
 
 // ============================================================================
-// 响应类型
+// Response types
 // ============================================================================
 
-/// Anthropic 非流式消息响应（流式的 message_start 也复用此结构）
+/// Anthropic non-streaming message response (also reused by the streaming message_start)
 #[derive(Debug, Serialize)]
 pub struct MessagesResponse {
     pub id: String,
@@ -303,7 +303,7 @@ pub struct MessagesResponse {
     pub usage: Usage,
 }
 
-/// Content block 变体（响应侧：只包含模型能输出的类型）
+/// Content block variants (response side: only includes types the model can output)
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
@@ -322,7 +322,7 @@ pub enum ResponseContentBlock {
     },
 }
 
-/// Token 用量
+/// Token usage
 #[derive(Debug, Serialize, Clone)]
 pub struct Usage {
     pub input_tokens: u32,
@@ -330,10 +330,10 @@ pub struct Usage {
 }
 
 // ============================================================================
-// 流式 chunk（对应 OpenAI 的 ChatCompletionsResponseChunk）
+// Streaming chunk (counterpart to OpenAI's ChatCompletionsResponseChunk)
 // ============================================================================
 
-/// Content block delta 变体
+/// Content block delta variants
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
@@ -346,7 +346,7 @@ pub enum ContentBlockDelta {
     InputJson { partial_json: String },
 }
 
-/// Anthropic 流式响应 chunk（对标 ChatCompletionsResponseChunk）
+/// Anthropic streaming response chunk (counterpart to ChatCompletionsResponseChunk)
 pub enum MessagesResponseChunk {
     MessageStart {
         message: MessagesResponse,
@@ -392,7 +392,7 @@ impl MessagesResponseChunk {
         }
     }
 
-    /// 序列化为 Anthropic SSE 事件格式：event: xxx\ndata: {json}\n\n
+    /// Serialize to Anthropic SSE event format: event: xxx\ndata: {json}\n\n
     pub fn to_sse_bytes(&self) -> Result<Bytes, serde_json::Error> {
         let json = match self {
             Self::MessageStart { message } => serde_json::to_string(&serde_json::json!({

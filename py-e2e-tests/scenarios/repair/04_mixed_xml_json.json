@@ -1,5 +1,5 @@
 {
-  "name": "XML+JSON混合格式",
+  "name": "XML+JSON mixed format",
   "endpoint": "openai",
   "category": "repair",
   "models": ["deepseek-default", "deepseek-expert"],

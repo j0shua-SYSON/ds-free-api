@@ -1,26 +1,26 @@
-//! 文件提取 —— 从 ChatCompletionsRequest 中提取内联文件数据
+//! File extraction -- extract inline file data from ChatCompletionsRequest
 //!
-//! 支持从以下 content part 中提取文件：
-//! - `file`：`file_data` 为 data URL 格式（`data:{mime};base64,{data}`）
-//! - `image_url`：`url` 为 data URL 格式（`data:image/*;base64,{data}`）
+//! Supports file extraction from the following content parts:
+//! - `file`: `file_data` is in data URL format (`data:{mime};base64,{data}`)
+//! - `image_url`: `url` is in data URL format (`data:image/*;base64,{data}`)
 //!
-//! 提取的文件会通过 ds_core 的 `FilePayload` 上传到 DeepSeek 会话中。
-//! 对于 `image_url` 的 HTTP URL，标记为需要开启搜索模式，
-//! 对应的 content part 在 prompt 中呈现为 `[请访问这个链接: {url}]`。
+//! Extracted files are uploaded to the DeepSeek session via ds_core's `FilePayload`.
+//! For HTTP URLs in `image_url`, marks the request as needing search mode;
+//! the corresponding content part is rendered in the prompt as `[please visit this link: {url}]`.
 
 use crate::openai_adapter::types::{ChatCompletionsRequest, ContentPart, MessageContent};
 use base64::Engine;
 use ds_core::FilePayload;
 
-/// 文件提取结果
+/// File extraction result
 pub(crate) struct ExtractResult {
-    /// 需要上传到 DeepSeek 会话的内联文件
+    /// Inline files to be uploaded to the DeepSeek session
     pub files: Vec<FilePayload>,
-    /// 是否包含需要模型通过搜索访问的 HTTP URL
+    /// Whether the request contains HTTP URLs that require the model to access via search
     pub has_http_urls: bool,
 }
 
-/// 从 ChatCompletionsRequest 中提取文件信息和 HTTP URL 标记
+/// Extract file information and HTTP URL flags from ChatCompletionsRequest
 pub(crate) fn extract(req: &ChatCompletionsRequest) -> ExtractResult {
     let mut files = Vec::new();
     let mut has_http_urls = false;
@@ -60,9 +60,9 @@ fn is_http_url(part: &ContentPart) -> bool {
         .is_some_and(|img| img.url.starts_with("http://") || img.url.starts_with("https://"))
 }
 
-/// 从 `file` content part 中提取文件
+/// Extract a file from a `file` content part
 ///
-/// `file_data` 格式：`data:{mime};base64,{data}`
+/// `file_data` format: `data:{mime};base64,{data}`
 fn extract_file(part: &ContentPart) -> Option<FilePayload> {
     let file = part.file.as_ref()?;
     let data_url = file.file_data.as_ref()?;
@@ -81,9 +81,9 @@ fn extract_file(part: &ContentPart) -> Option<FilePayload> {
     })
 }
 
-/// 从 `image_url` content part 中提取图片
+/// Extract an image from an `image_url` content part
 ///
-/// `url` 格式：`data:image/{format};base64,{data}`
+/// `url` format: `data:image/{format};base64,{data}`
 fn extract_image(part: &ContentPart) -> Option<FilePayload> {
     let url = part.image_url.as_ref()?.url.clone();
 
@@ -98,9 +98,9 @@ fn extract_image(part: &ContentPart) -> Option<FilePayload> {
     })
 }
 
-/// 解析 data URL 返回 (mime_type, base64_data)
+/// Parse a data URL and return (mime_type, base64_data)
 ///
-/// 格式：`data:[<mediatype>][;base64],<data>`
+/// Format: `data:[<mediatype>][;base64],<data>`
 fn parse_data_url(data_url: &str) -> Option<(String, &str)> {
     let remaining = data_url.strip_prefix("data:")?;
     let (header, data) = remaining.split_once(',')?;
@@ -119,7 +119,7 @@ fn parse_data_url(data_url: &str) -> Option<(String, &str)> {
 }
 
 fn base64_decode(data: &str) -> Option<Vec<u8>> {
-    // percent-decoding 不是必需的，但 data URL 中的部分字符可能被编码
+    // percent-decoding is not required, but some characters in data URLs may be encoded
     base64::engine::general_purpose::STANDARD.decode(data).ok()
 }
 

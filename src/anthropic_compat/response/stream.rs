@@ -1,4 +1,4 @@
-//! 流式响应映射 —— 将 ChatCompletionsResponseChunk 流映射为 MessagesResponseChunk 流
+﻿//! Streaming response mapping -- maps ChatCompletionsResponseChunk stream to MessagesResponseChunk stream
 
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -17,7 +17,7 @@ use crate::openai_adapter::types::ChatCompletionsResponseChunk;
 use super::{finish_reason_map, map_id};
 
 // ============================================================================
-// 状态机
+// State machine
 // ============================================================================
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -92,7 +92,7 @@ impl StreamState {
     fn handle_chunk(&mut self, chunk: ChatCompletionsResponseChunk) -> Vec<MessagesResponseChunk> {
         let mut events = Vec::new();
 
-        // 保活块 → 持续 thinking 块（不要独立块免干扰客户端）
+        // keepalive chunk -> sustained thinking block (avoid separate block to prevent client interference)
         if chunk.id == "chatcmpl-keepalive" && self.started {
             if self.block_kind != BlockKind::Thinking {
                 events.extend(self.transition_to(BlockKind::Thinking));
@@ -113,7 +113,7 @@ impl StreamState {
             return events;
         }
 
-        // role chunk → message_start（此时 chunk 已携带 prompt_tokens）
+        // role chunk -> message_start (the chunk already carries prompt_tokens at this point)
         if !self.started
             && let Some(choice) = chunk.choices.first()
             && choice.delta.role == Some("assistant")
@@ -126,7 +126,7 @@ impl StreamState {
             return events;
         }
 
-        // 优先提取 usage（可能独立 chunk 或与 finish 同 chunk）
+        // extract usage first (may be a standalone chunk or the same chunk as finish)
         if let Some(ref u) = chunk.usage {
             self.completion_tokens = Some(u.completion_tokens);
         }
@@ -178,7 +178,7 @@ impl StreamState {
             });
         }
 
-        // tool_calls（一次性完整输出）
+        // tool_calls (complete output in one go)
         if let Some(ref calls) = delta.tool_calls
             && !calls.is_empty()
         {
@@ -236,7 +236,7 @@ impl StreamState {
 }
 
 // ============================================================================
-// AnthropicStream 转换器
+// AnthropicStream converter
 // ============================================================================
 
 pin_project! {
@@ -267,7 +267,7 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
 
-        // 优先输出待处理事件
+        // output pending events first
         if !this.pending_events.is_empty() {
             let event = this.pending_events.remove(0);
             return Poll::Ready(Some(Ok(event)));
@@ -292,7 +292,7 @@ where
                     if !this.state.finished {
                         debug!(
                             target: "anthropic_compat::response::stream",
-                            "上游流错误后补齐 Anthropic 收尾事件: {}",
+                            "appending Anthropic closing events after upstream stream error: {}",
                             e
                         );
                         this.state.finished = true;
@@ -313,8 +313,8 @@ where
                     return Poll::Ready(None);
                 }
                 Poll::Ready(None) => {
-                    debug!(target: "anthropic_compat::response::stream", "流结束, started={}, finished={}", this.state.started, this.state.finished);
-                    // 流结束但未收到 finish_reason：优雅关闭
+                    debug!(target: "anthropic_compat::response::stream", "stream ended, started={}, finished={}", this.state.started, this.state.finished);
+                    // stream ended without receiving finish_reason: graceful shutdown
                     if !this.state.finished && this.state.started {
                         this.state.finished = true;
                         let mut events: Vec<MessagesResponseChunk> =
@@ -340,17 +340,17 @@ where
 }
 
 // ============================================================================
-// 公共入口
+// Public entry point
 // ============================================================================
 
-/// 将 ChatCompletionsResponseChunk 流映射为 MessagesResponseChunk 流
+/// Map a ChatCompletionsResponseChunk stream to a MessagesResponseChunk stream
 pub fn from_chat_completion_stream<S>(
     openai_stream: S,
 ) -> Pin<Box<dyn Stream<Item = Result<MessagesResponseChunk, AnthropicCompatError>> + Send>>
 where
     S: Stream<Item = Result<ChatCompletionsResponseChunk, OpenAIAdapterError>> + Send + 'static,
 {
-    debug!(target: "anthropic_compat::response::stream", "启动流式响应映射");
+    debug!(target: "anthropic_compat::response::stream", "starting streaming response mapping");
     Box::pin(AnthropicStream::new(openai_stream))
 }
 

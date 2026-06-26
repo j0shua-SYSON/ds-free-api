@@ -1,7 +1,7 @@
-//! Anthropic 协议兼容层 —— 基于 openai_adapter 提供 Anthropic API 兼容接口
+//! Anthropic protocol compatibility layer -- provides Anthropic API-compatible interface based on openai_adapter
 //!
-//! 本模块不直接访问 ds_core，所有数据通过 openai_adapter 获取并做格式映射。
-//! 请求流向：Anthropic JSON → ChatCompletionsRequest → openai_adapter → 响应映射回 Anthropic 格式。
+//! This module does not access ds_core directly; all data is fetched through openai_adapter and format-mapped.
+//! Request flow: Anthropic JSON -> ChatCompletionsRequest -> openai_adapter -> response mapped back to Anthropic format.
 
 mod models;
 pub(crate) mod request;
@@ -10,11 +10,11 @@ pub(crate) mod types;
 
 pub use types::{MessagesRequest, MessagesResponse, MessagesResponseChunk};
 
-/// Anthropic 流式响应类型（结构体流）
+/// Anthropic streaming response type (struct stream)
 pub type ChunkStream =
     Pin<Box<dyn Stream<Item = Result<MessagesResponseChunk, AnthropicCompatError>> + Send>>;
 
-/// Anthropic 流式响应类型（SSE 字节流）
+/// Anthropic streaming response type (SSE byte stream)
 pub type StreamResponse = Pin<Box<dyn Stream<Item = Result<Bytes, AnthropicCompatError>> + Send>>;
 
 use std::pin::Pin;
@@ -26,33 +26,33 @@ use log::debug;
 
 use crate::openai_adapter::{ChatOutput, ChatResult, OpenAIAdapter, OpenAIAdapterError};
 
-/// Anthropic 统一输出（对标 openai_adapter 的 ChatOutput）
+/// Anthropic unified output (counterpart to openai_adapter's ChatOutput)
 pub enum AnthropicOutput {
     Stream(ChunkStream),
     Json(MessagesResponse),
 }
 
-/// Anthropic 兼容层
+/// Anthropic compatibility layer
 pub struct AnthropicCompat {
     openai_adapter: Arc<OpenAIAdapter>,
 }
 
 impl AnthropicCompat {
-    /// 创建兼容层实例
+    /// Create a compatibility layer instance
     pub fn new(openai_adapter: Arc<OpenAIAdapter>) -> Self {
         Self { openai_adapter }
     }
 
-    /// POST /v1/messages（统一入口）
+    /// POST /v1/messages (unified entry point)
     ///
-    /// 将 Anthropic 请求映射为 ChatCompletionsRequest，委托给 openai_adapter，
-    /// 返回时再按 OpenAI 的 stream 分流结果映射回 Anthropic 格式。
+    /// Maps the Anthropic request to a ChatCompletionsRequest, delegates to openai_adapter,
+    /// then maps the result back to Anthropic format based on OpenAI stream output.
     pub async fn messages(
         &self,
         req: MessagesRequest,
         request_id: &str,
     ) -> Result<ChatResult<AnthropicOutput>, AnthropicCompatError> {
-        debug!(target: "anthropic_compat", "收到 messages 请求");
+        debug!(target: "anthropic_compat", "received messages request");
         let chat_req = request::into_chat_completions(req);
         let result = self
             .openai_adapter
@@ -76,22 +76,22 @@ impl AnthropicCompat {
 
     /// GET /v1/models
     ///
-    /// 返回 Anthropic 格式的模型列表。
+    /// Returns a model list in Anthropic format.
     pub async fn list_models(&self) -> models::AnthropicModelList {
-        debug!(target: "anthropic_compat", "收到模型列表请求");
+        debug!(target: "anthropic_compat", "received model list request");
         models::list(&self.openai_adapter.list_models().await)
     }
 
     /// GET /v1/models/{model_id}
     ///
-    /// 返回指定模型的 Anthropic 格式详情。
+    /// Returns the Anthropic format details for the specified model.
     pub async fn get_model(&self, model_id: &str) -> Option<models::AnthropicModel> {
-        debug!(target: "anthropic_compat", "查询模型: {}", model_id);
+        debug!(target: "anthropic_compat", "querying model: {}", model_id);
         models::get(&self.openai_adapter.list_models().await, model_id)
     }
 }
 
-/// Anthropic 兼容层错误类型
+/// Anthropic compatibility layer error type
 #[derive(Debug, thiserror::Error)]
 pub enum AnthropicCompatError {
     #[error("bad request: {0}")]
@@ -115,7 +115,7 @@ impl From<OpenAIAdapterError> for AnthropicCompatError {
 }
 
 impl AnthropicCompatError {
-    /// 返回对应 HTTP 状态码
+    /// Returns the corresponding HTTP status code
     #[must_use]
     pub fn status_code(&self) -> u16 {
         match self {

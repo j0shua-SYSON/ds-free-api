@@ -1,5 +1,5 @@
 {
-  "name": "标准工具调用",
+  "name": "Standard tool call",
   "endpoint": "anthropic",
   "category": "basic",
   "models": ["deepseek-default", "deepseek-expert"],

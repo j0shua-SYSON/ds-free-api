@@ -1,5 +1,5 @@
 {
-  "name": "JSON-参数外溢",
+  "name": "JSON - parameters spilled",
   "endpoint": "openai",
   "category": "repair",
   "models": ["deepseek-default", "deepseek-expert"],

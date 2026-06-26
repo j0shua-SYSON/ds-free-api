@@ -1,5 +1,5 @@
 {
-  "name": "XML-多参数",
+  "name": "XML - multi-param",
   "endpoint": "openai",
   "category": "repair",
   "models": ["deepseek-default", "deepseek-expert"],

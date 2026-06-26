@@ -13,7 +13,7 @@ export function clearToken() {
 
 let onUnauthorized: (() => void) | null = null;
 
-/** 注册 401 回调：收到 401 时自动调用（用于 AuthProvider 同步 token 状态） */
+/** Register 401 callback: automatically called when 401 is received (used by AuthProvider to sync token state) */
 export function setOnUnauthorized(cb: (() => void) | null) {
   onUnauthorized = cb;
 }

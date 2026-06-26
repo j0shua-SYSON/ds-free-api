@@ -1,5 +1,5 @@
 {
-  "name": "JSON-字段名不一致",
+  "name": "JSON - wrong field names",
   "endpoint": "openai",
   "category": "repair",
   "models": ["deepseek-default", "deepseek-expert"],

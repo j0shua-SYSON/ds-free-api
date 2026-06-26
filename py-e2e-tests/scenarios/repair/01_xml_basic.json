@@ -1,5 +1,5 @@
 {
-  "name": "XML-基础",
+  "name": "XML - basic",
   "endpoint": "openai",
   "category": "repair",
   "models": ["deepseek-default", "deepseek-expert"],

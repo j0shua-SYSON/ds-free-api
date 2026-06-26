@@ -1,7 +1,7 @@
 {
   "model": "deepseek-expert",
   "messages": [
-    { "role": "user", "content": "分析一下 Rust 异步运行时的工作原理" }
+    { "role": "user", "content": "Analyze how the Rust async runtime works." }
   ],
   "reasoning_effort": "high"
 }

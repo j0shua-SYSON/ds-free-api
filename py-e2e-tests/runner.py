@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""统一端到端测试入口 —— 加载 scenarios/ 下的 JSON 场景文件并执行
+"""Unified end-to-end test entry point -- loads JSON scenario files under scenarios/ and runs them
 
-用法：
-  uv run python runner.py scenarios/basic                    # 全部 basic（两端点）
-  uv run python runner.py scenarios/basic --endpoint openai   # 仅 OpenAI
-  uv run python runner.py scenarios/repair                    # 全部 repair
-  uv run python runner.py scenarios/basic --filter 流式       # 按名称过滤
+Usage:
+  uv run python runner.py scenarios/basic                    # all basic (both endpoints)
+  uv run python runner.py scenarios/basic --endpoint openai   # OpenAI only
+  uv run python runner.py scenarios/repair                    # all repair
+  uv run python runner.py scenarios/basic --filter streaming  # filter by name keyword
 """
 
 import argparse
@@ -25,10 +25,10 @@ from config import load_config
 
 
 def load_scenarios(scenario_dir: str, endpoint: str | None, filter_names: list[str] | None) -> list[dict]:
-    """加载场景 JSON 文件"""
+    """Load scenario JSON files."""
     base = Path(scenario_dir)
     if not base.exists():
-        print(f"[错误] 场景目录不存在: {scenario_dir}")
+        print(f"[Error] scenario directory not found: {scenario_dir}")
         sys.exit(1)
 
     if base.name == "basic":
@@ -52,21 +52,21 @@ def load_scenarios(scenario_dir: str, endpoint: str | None, filter_names: list[s
             scenarios.append(sc)
 
     if not scenarios:
-        print(f"[错误] 未找到匹配的场景")
+        print(f"[Error] no matching scenarios found")
         sys.exit(1)
     return scenarios
 
 
 def _resolve_scenario(scenario: dict, model: str) -> dict[str, Any]:
-    """将场景定义解析为 OpenAI API 参数"""
-    # messages 可在顶层或 request 内
+    """Resolve scenario definition into OpenAI API kwargs."""
+    # messages may live at top level or inside request
     messages = scenario.get("messages") or scenario["request"]["messages"]
     system = scenario.get("system", "")
     if system:
         messages = [{"role": "system", "content": system}, *messages]
 
     kwargs: dict[str, Any] = dict(model=model, messages=messages)
-    # 合并 request 中除 stream 外的参数
+    # merge request params except stream
     req = scenario.get("request", {})
     kwargs.update({k: v for k, v in req.items() if k != "stream"})
 
@@ -79,7 +79,7 @@ def _resolve_scenario(scenario: dict, model: str) -> dict[str, Any]:
 
 
 def run_openai(client: OpenAI, scenario: dict, model: str) -> dict[str, Any]:
-    """执行一次 OpenAI 端点场景"""
+    """Run a single OpenAI endpoint scenario."""
     name = scenario["name"]
     req_conf = scenario.get("request", {})
     stream = req_conf.get("stream", False)
@@ -110,7 +110,7 @@ def run_openai(client: OpenAI, scenario: dict, model: str) -> dict[str, Any]:
         ]
         result["has_tool_calls"] = len(result["tool_calls"]) > 0
 
-        # 执行 checks
+        # run checks
         checks = scenario.get("checks", {})
         errors = _check_openai(checks, result)
         if errors:
@@ -126,7 +126,7 @@ def run_openai(client: OpenAI, scenario: dict, model: str) -> dict[str, Any]:
 
 
 def _openai_stream_collect(client: OpenAI, **kwargs: Any) -> dict:
-    """流式请求：收集所有 chunks 并组装为 quasi-Response dict"""
+    """Streaming request: collect all chunks and assemble into a quasi-Response dict."""
     kwargs["stream"] = True
     stream = client.chat.completions.create(**kwargs)
 
@@ -172,21 +172,21 @@ def _openai_stream_collect(client: OpenAI, **kwargs: Any) -> dict:
 def _check_openai(checks: dict, result: dict) -> list[str]:
     errors: list[str] = []
     if checks.get("content_not_empty") and not result.get("content"):
-        errors.append("内容为空")
+        errors.append("content is empty")
     if checks.get("has_tool_calls") and not result.get("has_tool_calls"):
-        errors.append("未触发工具调用")
+        errors.append("no tool calls triggered")
     if checks.get("finish_reason") and result.get("finish_reason") != checks["finish_reason"]:
-        errors.append(f"finish_reason={result.get('finish_reason')}, 期望={checks['finish_reason']}")
+        errors.append(f"finish_reason={result.get('finish_reason')}, expected={checks['finish_reason']}")
     if checks.get("tool_names"):
         actual = {tc["name"] for tc in result.get("tool_calls", [])}
         expected = set(checks["tool_names"])
         if not expected.issubset(actual):
-            errors.append(f"工具名不匹配: 期望{expected}, 实际{actual}")
+            errors.append(f"tool names mismatch: expected {expected}, actual {actual}")
     return errors
 
 
 def run_anthropic(client: Anthropic, scenario: dict, model: str) -> dict[str, Any]:
-    """执行一次 Anthropic 端点场景"""
+    """Run a single Anthropic endpoint scenario."""
     name = scenario["name"]
     req_conf = scenario.get("request", {})
 
@@ -197,7 +197,7 @@ def run_anthropic(client: Anthropic, scenario: dict, model: str) -> dict[str, An
     }
 
     try:
-        # Anthropic 的 messages 始终在 request 内
+        # Anthropic messages always live inside request
         kwargs: dict[str, Any] = dict(
             model=model,
             **{k: v for k, v in req_conf.items() if k != "stream"},
@@ -239,7 +239,7 @@ def run_anthropic(client: Anthropic, scenario: dict, model: str) -> dict[str, An
 
 
 def _anthropic_stream_collect(client: Anthropic, **kwargs: Any) -> Any:
-    """流式请求：收集 Anthropic stream events"""
+    """Streaming request: collect Anthropic stream events."""
     kwargs = {k: v for k, v in kwargs.items() if v is not None}
     with client.messages.stream(**kwargs) as stream:
         return stream.get_final_message()
@@ -248,36 +248,36 @@ def _anthropic_stream_collect(client: Anthropic, **kwargs: Any) -> Any:
 def _check_anthropic(checks: dict, result: dict) -> list[str]:
     errors: list[str] = []
     if checks.get("content_not_empty") and not result.get("content"):
-        errors.append("内容为空")
+        errors.append("content is empty")
     if checks.get("has_tool_use") and not result.get("has_tool_use"):
-        errors.append("未触发工具调用")
+        errors.append("no tool calls triggered")
     if checks.get("stop_reason") and result.get("stop_reason") != checks["stop_reason"]:
-        errors.append(f"stop_reason={result.get('stop_reason')}, 期望={checks['stop_reason']}")
+        errors.append(f"stop_reason={result.get('stop_reason')}, expected={checks['stop_reason']}")
     if checks.get("tool_names"):
         actual = {tu["name"] for tu in result.get("tool_uses", [])}
         expected = set(checks["tool_names"])
         if not expected.issubset(actual):
-            errors.append(f"工具名不匹配: 期望{expected}, 实际{actual}")
+            errors.append(f"tool names mismatch: expected {expected}, actual {actual}")
     return errors
 
 
 def _print_output(result: dict) -> None:
-    """打印模型输出内容（用于 --show-output）"""
+    """Print model output content (used with --show-output)."""
     content = (result.get("content") or "")[:300].replace("\n", "\\n")
     if content:
-        print(f"    ├ 回复: {content}")
+        print(f"    ├ Reply: {content}")
     if result.get("has_tool_calls") or result.get("has_tool_use"):
         calls = result.get("tool_calls") or result.get("tool_uses") or []
         for tc in calls:
             name = tc.get("name", "?")
             args = tc.get("arguments") or tc.get("input") or {}
             args_str = json.dumps(args, ensure_ascii=False)[:120]
-            print(f"    ├ 工具: {name}({args_str})")
+            print(f"    ├ Tool: {name}({args_str})")
     fr = result.get("finish_reason") or result.get("stop_reason") or ""
     if fr:
-        print(f"    └ 结束: {fr}")
+        print(f"    └ Finish: {fr}")
     if result.get("error"):
-        print(f"    └ 错误: {result['error']}")
+        print(f"    └ Error: {result['error']}")
 
 
 def format_duration(seconds: float) -> str:
@@ -293,10 +293,10 @@ def print_report(results: list[dict[str, Any]], suite_name: str, parallel: int):
 
     print(f"\n{'=' * 60}")
     print(f"  {suite_name}")
-    print(f"  时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"  并行: {parallel}")
+    print(f"  Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"  Parallel: {parallel}")
     print(f"{'=' * 60}")
-    print(f"  总计: {total}  |  通过: {passed}  |  失败: {total - passed}  |  总耗时: {format_duration(duration)}")
+    print(f"  Total: {total}  |  Passed: {passed}  |  Failed: {total - passed}  |  Duration: {format_duration(duration)}")
 
     ep_label = {"openai": "OAI", "anthropic": "ANT"}
     for r in sorted(results, key=lambda x: (x["name"], x.get("endpoint", ""), x["model"])):
@@ -307,7 +307,7 @@ def print_report(results: list[dict[str, Any]], suite_name: str, parallel: int):
 
     if total - passed > 0:
         print(f"\n  {'─' * 48}")
-        print(f"  失败详情:")
+        print(f"  Failure details:")
         for r in results:
             if not r["passed"]:
                 print(f"  [{r['endpoint']}] {r['name']} ({r['model']}): {r['error']}")
@@ -321,18 +321,18 @@ def main():
     safe_concurrency = config["safe_concurrency"]
     api_key = config["api_key"]
 
-    parser = argparse.ArgumentParser(description="端到端测试统一入口")
-    parser.add_argument("scenario_dir", help="场景目录 (如 scenarios/basic 或 scenarios/repair)")
-    parser.add_argument("--endpoint", choices=["openai", "anthropic"], default=None, help="端点过滤")
-    parser.add_argument("--model", type=str, default=None, help="模型过滤")
-    parser.add_argument("--filter", type=str, nargs="*", default=None, help="场景名称关键字过滤（多个用空格分隔）")
-    parser.add_argument("--parallel", type=int, default=safe_concurrency, help=f"并行数 (默认: {safe_concurrency})")
-    parser.add_argument("--report", type=str, default=None, help="输出 JSON 报告路径")
-    parser.add_argument("--show-output", action="store_true", help="显示模型输出内容")
+    parser = argparse.ArgumentParser(description="Unified end-to-end test entry point")
+    parser.add_argument("scenario_dir", help="scenario directory (e.g. scenarios/basic or scenarios/repair)")
+    parser.add_argument("--endpoint", choices=["openai", "anthropic"], default=None, help="endpoint filter")
+    parser.add_argument("--model", type=str, default=None, help="model filter")
+    parser.add_argument("--filter", type=str, nargs="*", default=None, help="scenario name keyword filter (multiple values separated by spaces)")
+    parser.add_argument("--parallel", type=int, default=safe_concurrency, help=f"parallelism (default: {safe_concurrency})")
+    parser.add_argument("--report", type=str, default=None, help="output JSON report path")
+    parser.add_argument("--show-output", action="store_true", help="display model output content")
     args = parser.parse_args()
 
     scenarios = load_scenarios(args.scenario_dir, args.endpoint, args.filter)
-    # 模型来源：--model 参数优先，否则从 config.toml 动态获取
+    # model source: --model flag takes priority, otherwise loaded dynamically from config.toml
     models = [args.model] if args.model else config.get("models", ["deepseek-default"])
 
     port = config["port"]
@@ -343,9 +343,9 @@ def main():
         http_client=httpx.Client(timeout=120),
     )
 
-    suite_name = f"{Path(args.scenario_dir).name} 测试"
+    suite_name = f"{Path(args.scenario_dir).name} test"
     print(f"\n{suite_name}")
-    print(f"  场景: {len(scenarios)} 个, 模型: {', '.join(models)}, 并行: {args.parallel}")
+    print(f"  Scenarios: {len(scenarios)}, Models: {', '.join(models)}, Parallel: {args.parallel}")
 
     tasks: list[tuple[str, str, dict]] = []
     for model in models:
@@ -354,7 +354,7 @@ def main():
 
     all_results: list[dict[str, Any]] = [None] * len(tasks)  # type: ignore[list-item]
 
-    # 记录每个任务的标签用于进度展示
+    # record per-task label for progress display
     ep_label = {"openai": "OAI", "anthropic": "ANT"}
     task_labels: dict[int, str] = {}
     for i, (ep, model, sc) in enumerate(tasks):
@@ -398,7 +398,7 @@ def main():
                 "summary": report,
                 "results": all_results,
             }, f, ensure_ascii=False, indent=2)
-        print(f"  报告已输出: {args.report}")
+        print(f"  Report written to: {args.report}")
 
     sys.exit(0 if report["failed"] == 0 else 1)
 

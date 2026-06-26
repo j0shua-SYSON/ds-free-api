@@ -1,7 +1,8 @@
-//! 流处理模块 —— 精简响应协议与 DeepSeek SSE 解析
+//! Stream processing module -- simplified response protocol and DeepSeek SSE parsing
 //!
-//! 协议定义：将 DeepSeek 原始 SSE 字节流（p/o/v patch 协议）转换为结构化事件序列，
-//! 主 crate 只需消费 StreamEvent，不再感知底层格式。
+//! Protocol: converts the raw DeepSeek SSE byte stream (p/o/v patch protocol) into a
+//! structured event sequence; the main crate only consumes StreamEvent and is no longer
+//! aware of the underlying format.
 
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -16,7 +17,7 @@ use crate::CoreError;
 use crate::accounts::ClientError;
 use crate::accounts::{AccountGuard, DsClient, StopStreamPayload};
 
-// ── 精简响应协议 ──────────────────────────────────────────────────────
+// ── Simplified response protocol ──────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
 pub enum StreamEvent {
@@ -37,7 +38,7 @@ pub enum StreamEvent {
     },
 }
 
-// ── 内部类型 ──────────────────────────────────────────────────────────
+// ── Internal types ──────────────────────────────────────────────────────────
 
 pub(crate) struct ActiveSession {
     pub(crate) token: String,
@@ -78,21 +79,21 @@ impl SessionHandle {
     }
 }
 
-// ── DeepSeek Patch 状态机 ─────────────────────────────────────────────
+// ── DeepSeek Patch state machine ─────────────────────────────────────────────
 
 const FRAG_THINK: &str = "THINK";
 const FRAG_RESPONSE: &str = "RESPONSE";
 
-/// Fragment 状态
+/// Fragment state
 struct Fragment {
     ty: String,
     content: String,
 }
 
-/// 维护 DeepSeek 响应的 patch 状态，对齐前端 DeltaParser
+/// Maintains patch state for the DeepSeek response, aligned with the frontend DeltaParser
 ///
-/// - `p` / `o` 跨事件持久化
-/// - `o` 默认 "SET"
+/// - `p` / `o` persist across events
+/// - `o` defaults to "SET"
 struct PatchState {
     current_path: Option<String>,
     current_op: Option<String>,
@@ -112,13 +113,13 @@ impl PatchState {
         }
     }
 
-    /// 消费一帧 SSE 文本，返回零个或多个 StreamEvent
+    /// Consume one SSE frame of text and return zero or more StreamEvent items
     fn apply_frame(&mut self, frame: &str) -> Result<Vec<StreamEvent>, CoreError> {
         if frame.is_empty() {
             return Ok(Vec::new());
         }
 
-        // 提取 event 和 data 行
+        // Extract event and data lines
         let event_type = frame
             .lines()
             .find_map(|l| l.trim().strip_prefix("event:"))
@@ -131,15 +132,15 @@ impl PatchState {
 
         let mut events = Vec::new();
 
-        // event: ready → 不产出事件（在初始化阶段已处理）
-        // event: hint → 检查错误
+        // event: ready -> produces no event (already handled during initialization)
+        // event: hint -> check for errors
         if let Some("hint") = event_type
             && let Some(data) = data
         {
             return Err(hint_to_error(data));
         }
 
-        // 解析 data JSON
+        // Parse data JSON
         if let Some(data) = data
             && let Ok(val) = serde_json::from_str::<serde_json::Value>(data)
         {
@@ -149,9 +150,9 @@ impl PatchState {
         Ok(events)
     }
 
-    /// 应用 p/o/v patch
+    /// Apply p/o/v patch
     fn apply_patch(&mut self, val: serde_json::Value) -> Vec<StreamEvent> {
-        // p/o 跨事件持久化
+        // p/o persist across events
         if let Some(p) = val.get("p").and_then(|v| v.as_str()) {
             self.current_path = Some(p.to_string());
         }
@@ -166,14 +167,14 @@ impl PatchState {
             return Vec::new();
         };
 
-        // 初始快照：无 path 且 v 含 response
+        // Initial snapshot: no path and v contains response
         if self.current_path.is_none()
             && let Some(response) = v.get("response")
         {
             return self.apply_initial_snapshot(response);
         }
 
-        // BATCH 递归分解
+        // BATCH: recursively decompose
         if op == "BATCH" && v.is_array() {
             return self.apply_batch(&path, v);
         }
@@ -187,7 +188,7 @@ impl PatchState {
             return events;
         };
 
-        // 子解析器独立状态
+        // Subordinate parser with independent state
         let (mut sub_path, mut sub_op) = (String::new(), String::from("SET"));
 
         for item in arr {
@@ -335,7 +336,7 @@ impl PatchState {
     }
 }
 
-// ── 响应阶段跟踪 ─────────────────────────────────────────────────────
+// ── Response phase tracking ─────────────────────────────────────────────────────
 
 #[derive(PartialEq)]
 enum Phase {
@@ -396,7 +397,7 @@ impl Stream for ResponseStream {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
 
-        // 首个事件始终是 Meta
+        // The first event is always Meta
         if !*this.meta_sent {
             *this.meta_sent = true;
             return Poll::Ready(Some(Ok(StreamEvent::Meta {
@@ -404,7 +405,7 @@ impl Stream for ResponseStream {
             })));
         }
 
-        // 先清空 pending 队列
+        // Drain the pending queue first
         if let Some(evt) = this.pending.pop() {
             return Poll::Ready(Some(Ok(evt)));
         }
@@ -424,7 +425,7 @@ impl Stream for ResponseStream {
                     continue;
                 }
 
-                // 过滤：阶段切换信号插入 + 延后排队
+                // Filter: insert phase-transition signals and queue the rest
                 let mut filtered = Vec::new();
                 for evt in events {
                     match &evt {
@@ -445,7 +446,7 @@ impl Stream for ResponseStream {
                     filtered.push(evt);
                 }
 
-                // 检查 status 是否已结束
+                // Check whether status indicates completion
                 if let Some(status) = &this.patch_state.status
                     && (status == "FINISHED" || status == "INCOMPLETE")
                 {
@@ -455,7 +456,7 @@ impl Stream for ResponseStream {
                     if finish.is_some() && !has_response_content(this.patch_state) {
                         log::warn!(
                             target: "ds_core::accounts",
-                            "状态机 FINISHED 但无 RESPONSE 内容"
+                            "state machine FINISHED but no RESPONSE content"
                         );
                     }
                     filtered.push(StreamEvent::Done {
@@ -464,7 +465,7 @@ impl Stream for ResponseStream {
                     });
                 }
 
-                // 第一个事件立即返回，其余入 pending
+                // Return the first event immediately; put the rest into pending
                 if let Some(first) = filtered.first().cloned() {
                     for rest in filtered.into_iter().skip(1).rev() {
                         this.pending.push(rest);
@@ -482,7 +483,7 @@ impl Stream for ResponseStream {
                 }
                 Poll::Ready(None) => {
                     *this.finished = true;
-                    // 处理缓冲区中剩余数据
+                    // Process remaining data in buffer
                     if !this.buf.is_empty() {
                         let drained: Vec<u8> = this.buf.drain(..).collect();
                         let frame = String::from_utf8_lossy(&drained);
@@ -493,7 +494,7 @@ impl Stream for ResponseStream {
                             return Poll::Ready(Some(Ok(first)));
                         }
                     }
-                    // 未正常结束时，发送 Done
+                    // Send Done when not finished normally
                     if *this.phase != Phase::Done {
                         *this.phase = Phase::Done;
                         return Poll::Ready(Some(Ok(StreamEvent::Done {
@@ -509,7 +510,7 @@ impl Stream for ResponseStream {
     }
 }
 
-// ── SSE 帧提取 ───────────────────────────────────────────────────────
+// ── SSE frame extraction ───────────────────────────────────────────────────────
 
 fn take_frame(buf: &mut Vec<u8>) -> Option<String> {
     let pos = buf.windows(2).position(|w| w == b"\n\n")?;
@@ -529,15 +530,15 @@ fn hint_to_error(data: &str) -> CoreError {
     if content.contains("rate_limit") {
         CoreError::Overloaded
     } else if content.contains("input_exceeds_limit") {
-        CoreError::ProviderError("输入内容超长，请缩短后重试".into())
+        CoreError::ProviderError("Input is too long; please shorten it and retry".into())
     } else {
         CoreError::ProviderError(format!("hint: {}", content))
     }
 }
 
-// ── 内部辅助（供 ResponseStream 使用） ─────────────────────────────────
+// ── Internal helpers (for use by ResponseStream) ─────────────────────────────────
 
-/// 检查是否有非空的 RESPONSE 内容（用于 FINISHED 告警）
+/// Check whether there is any non-empty RESPONSE content (used for FINISHED warning)
 fn has_response_content(state: &PatchState) -> bool {
     state
         .fragments
@@ -545,7 +546,7 @@ fn has_response_content(state: &PatchState) -> bool {
         .any(|f| f.ty == "RESPONSE" && !f.content.is_empty())
 }
 
-// ── 公开辅助（供 request.rs 初始化阶段使用） ──────────────────────────
+// ── Public helpers (for use by request.rs during initialization) ──────────────────────────
 
 pub(crate) fn split_two_events(buf: &str) -> Option<(&str, &str)> {
     let parts: Vec<&str> = buf.splitn(3, "\n\n").collect();
@@ -566,7 +567,7 @@ pub(crate) fn check_hint(event_block: &str) -> Option<CoreError> {
     }
     if event_block.contains("input_exceeds_limit") {
         return Some(CoreError::ProviderError(
-            "输入内容超长，请缩短后重试".into(),
+            "Input is too long; please shorten it and retry".into(),
         ));
     }
     None
@@ -602,7 +603,7 @@ pub(crate) fn parse_json_error(text: &str, request_id: &str) -> CoreError {
             .to_string();
         log::error!(
             target: "ds_core::accounts",
-            "req={} JSON 错误响应: code={}, msg={}", request_id, code, msg
+            "req={} JSON error response: code={}, msg={}", request_id, code, msg
         );
         return match code {
             1001 | 1201 => CoreError::Overloaded,
@@ -612,10 +613,10 @@ pub(crate) fn parse_json_error(text: &str, request_id: &str) -> CoreError {
     }
     log::error!(
         target: "ds_core::accounts",
-        "req={} 无法解析的响应: {}", request_id, raw.chars().take(200).collect::<String>()
+        "req={} unparseable response: {}", request_id, raw.chars().take(200).collect::<String>()
     );
     CoreError::Stream(format!(
-        "无法解析的响应: {}",
+        "unparseable response: {}",
         raw.chars().take(200).collect::<String>()
     ))
 }
@@ -638,7 +639,7 @@ pub(crate) async fn wait_ready_and_update(
                     return parse_json_error(&raw, request_id);
                 }
                 CoreError::Stream(format!(
-                    "req={} 分块 {}/{} 收到空流",
+                    "req={} chunk {}/{} received empty stream",
                     request_id, chunk_index, total_chunks
                 ))
             })?
@@ -711,7 +712,7 @@ pub(crate) async fn wait_close(
             .await
             .ok_or_else(|| {
                 CoreError::Stream(format!(
-                    "req={} 分块 {}/{} 流在 close 前结束",
+                    "req={} chunk {}/{} stream ended before close",
                     request_id, chunk_index, total_chunks
                 ))
             })?

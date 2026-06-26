@@ -1,5 +1,5 @@
 {
-  "name": "XML-混合工具",
+  "name": "XML - mixed tools",
   "endpoint": "openai",
   "category": "repair",
   "models": ["deepseek-default", "deepseek-expert"],

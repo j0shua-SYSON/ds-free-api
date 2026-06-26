@@ -1,28 +1,28 @@
-# DeepSeek 后端 API 参考
+# DeepSeek Backend API Reference
 
-本文档描述 `ds_core` 内部 `DsClient` 向 DeepSeek 后端发起的原始 HTTP 请求。
+This document describes the raw HTTP requests made by `DsClient` inside `ds_core` to the DeepSeek backend.
 
-## 基本信息
+## General Information
 
 ### Base URLs
 
-- `https://chat.deepseek.com/api/v0` — 所有 API 端点
-- `https://fe-static.deepseek.com` — WASM 文件下载
+- `https://chat.deepseek.com/api/v0` — all API endpoints
+- `https://fe-static.deepseek.com` — WASM file downloads
 
-### 公共请求头
+### Common Request Headers
 
-| Header | 说明 |
+| Header | Description |
 |--------|------|
-| `User-Agent` | 必填，WAF 绕过，值需像真实浏览器 UA |
-| `Authorization: Bearer <token>` | 鉴权请求必填 |
-| `X-Ds-Pow-Response: <base64>` | 需要 PoW 的请求必填 |
-| `X-Client-Version` | 客户端版本号（当前对应 `2.0.0`） |
-| `X-Client-Platform` | 客户端平台 |
-| `X-Client-Locale` | 客户端语言区域 |
+| `User-Agent` | Required; WAF bypass — the value must resemble a real browser UA |
+| `Authorization: Bearer <token>` | Required for authenticated requests |
+| `X-Ds-Pow-Response: <base64>` | Required for requests that require PoW |
+| `X-Client-Version` | Client version number (currently `2.0.0`) |
+| `X-Client-Platform` | Client platform |
+| `X-Client-Locale` | Client locale |
 
-### 响应信封格式
+### Response Envelope Format
 
-所有非流式响应使用统一的 `Envelope` 封装：
+All non-streaming responses use a unified `Envelope` wrapper:
 
 ```json
 {
@@ -36,36 +36,36 @@
 }
 ```
 
-- `code != 0` → 系统级错误（如 40003 无效 Token）
-- `biz_code != 0` → 业务级错误
-- `biz_data` → 实际数据
+- `code != 0` -> system-level error (e.g., 40003 invalid token)
+- `biz_code != 0` -> business-level error
+- `biz_data` -> actual data
 
-### PoW target_path 映射
+### PoW target_path Mapping
 
-| 端点 | target_path |
+| Endpoint | target_path |
 |------|-------------|
 | completion | `/api/v0/chat/completion` |
 | edit_message | `/api/v0/chat/edit_message` |
 | upload_file | `/api/v0/file/upload_file` |
 
-### 错误响应格式
+### Error Response Format
 
-| 情况 | 格式 |
+| Case | Format |
 |------|------|
-| 字段缺失 | HTTP 422: `{"detail":[{"loc":"body.<field>"}]}` |
-| 无效 Token | HTTP 200: `{"code":40003,"msg":"Authorization Failed (invalid token)","data":null}` |
-| 业务错误 | HTTP 200: `{"code":0,"data":{"biz_code":<N>,"biz_msg":"<msg>","biz_data":null}}` |
-| 登录失败 | HTTP 200: `{"code":0,"data":{"biz_code":2,"biz_msg":"PASSWORD_OR_USER_NAME_IS_WRONG"}}` |
+| Missing field | HTTP 422: `{"detail":[{"loc":"body.<field>"}]}` |
+| Invalid token | HTTP 200: `{"code":40003,"msg":"Authorization Failed (invalid token)","data":null}` |
+| Business error | HTTP 200: `{"code":0,"data":{"biz_code":<N>,"biz_msg":"<msg>","biz_data":null}}` |
+| Login failure | HTTP 200: `{"code":0,"data":{"biz_code":2,"biz_msg":"PASSWORD_OR_USER_NAME_IS_WRONG"}}` |
 
 ---
 
-## 0. 登录 login
+## 0. Login
 
 - **URL**: `POST /api/v0/users/login`
-- **请求头**:
-  - `User-Agent`：必填
-  - `Content-Type: application/json`：可选（HTTP 库自动设置时不需要）
-- **请求体**:
+- **Headers**:
+  - `User-Agent`: Required
+  - `Content-Type: application/json`: Optional (not needed when the HTTP library sets it automatically)
+- **Request body**:
 
 ```json
 {
@@ -73,16 +73,16 @@
   "mobile": "[phone_number]",
   "password": "<password>",
   "area_code": "+86",
-  "device_id": "[任意 base64 或空字符串，但字段不能省略]",
+  "device_id": "[any base64 value or empty string, but the field must not be omitted]",
   "os": "web"
 }
 ```
 
-- `email` / `mobile`：二选一，另一个传 `null`
-- `device_id`：必填字段（省略 → 422），但值可为空或随机
-- `os`：必填（省略 → 422），固定 `"web"`
+- `email` / `mobile`: use one, pass `null` for the other
+- `device_id`: required field (omitted -> 422), but the value can be empty or random
+- `os`: required (omitted -> 422), must be `"web"`
 
-- **响应**:
+- **Response**:
 
 ```json
 {
@@ -112,17 +112,17 @@
 }
 ```
 
-- **关键字段**: `data.biz_data.user.token`（后续所有请求的 Bearer token）
-- **错误**: `biz_code=2` / `biz_msg="PASSWORD_OR_USER_NAME_IS_WRONG"`
+- **Key field**: `data.biz_data.user.token` (the Bearer token for all subsequent requests)
+- **Error**: `biz_code=2` / `biz_msg="PASSWORD_OR_USER_NAME_IS_WRONG"`
 
 ---
 
-## 1. 创建会话 create_session
+## 1. Create Session
 
 - **URL**: `POST /api/v0/chat_session/create`
-- **请求头**: `Authorization`, `User-Agent`
-- **请求体**: `{}`
-- **响应**:
+- **Headers**: `Authorization`, `User-Agent`
+- **Request body**: `{}`
+- **Response**:
 
 ```json
 {
@@ -150,25 +150,25 @@
 }
 ```
 
-- **关键字段**: `data.biz_data.chat_session.id`（后续 completion 用的 `chat_session_id`）
-- `ttl_seconds`: 259200（3天），会话有效期
+- **Key field**: `data.biz_data.chat_session.id` (the `chat_session_id` used in subsequent completion requests)
+- `ttl_seconds`: 259200 (3 days), session validity period
 
 ---
 
-## 2. 获取 WASM get_wasm
+## 2. Fetch WASM
 
 - **URL**: `GET https://fe-static.deepseek.com/chat/static/sha3_wasm_bg.<hash>.wasm`
-- **请求头**: 无需鉴权，无需 User-Agent
-- **响应**: 约 26KB，`Content-Type: application/wasm`，标准 WASM 格式（`\x00asm` magic number）
-- **注意**: URL 中的 hash 部分可能改变，建议可配置
+- **Headers**: no authentication required, no User-Agent needed
+- **Response**: approximately 26 KB, `Content-Type: application/wasm`, standard WASM format (`\x00asm` magic number)
+- **Note**: the hash portion of the URL may change; it is recommended to make this configurable
 
 ---
 
-## 3. 创建 PoW Challenge create_pow_challenge
+## 3. Create PoW Challenge
 
 - **URL**: `POST /api/v0/chat/create_pow_challenge`
-- **请求头**: `Authorization`, `User-Agent`
-- **请求体**:
+- **Headers**: `Authorization`, `User-Agent`
+- **Request body**:
 
 ```json
 {
@@ -176,7 +176,7 @@
 }
 ```
 
-- **响应**:
+- **Response**:
 
 ```json
 {
@@ -201,24 +201,24 @@
 }
 ```
 
-- 关键字段: `challenge`（哈希输入前缀）、`salt`（拼接用）、`difficulty`（目标阈值）、`expire_at`（过期时间戳 ms）
-- `algorithm`: 固定 `"DeepSeekHashV1"`
-- `expire_after`: 300000ms = 5 分钟有效期
+- Key fields: `challenge` (hash input prefix), `salt` (concatenation value), `difficulty` (target threshold), `expire_at` (expiration timestamp in ms)
+- `algorithm`: always `"DeepSeekHashV1"`
+- `expire_after`: 300000 ms = 5-minute validity period
 
 ---
 
-## 4. 对话完成 completion
+## 4. Chat Completion
 
 - **URL**: `POST /api/v0/chat/completion`
-- **请求头**: `Authorization`, `User-Agent`, `X-Ds-Pow-Response`（每次请求必须重新计算）
-- **请求体**:
+- **Headers**: `Authorization`, `User-Agent`, `X-Ds-Pow-Response` (must be recomputed for each request)
+- **Request body**:
 
 ```json
 {
-  "chat_session_id": "<来自 create 端点的 id>",
+  "chat_session_id": "<id from the create endpoint>",
   "parent_message_id": null,
   "model_type": "default",
-  "prompt": "你好",
+  "prompt": "Hello",
   "ref_file_ids": ["file-xxx"],
   "thinking_enabled": true,
   "search_enabled": true,
@@ -226,63 +226,63 @@
 }
 ```
 
-- `model_type`: `"expert"`（默认）| `"default"` | 等
-- `ref_file_ids`: 上传文件后返回的文件 ID 数组，会话级别记忆，后续 `edit_message` 无需重复传入
-- `preempt`: 预占模式（目前网页端未使用），默认 false
-- **Response**: `text/event-stream` SSE 流
+- `model_type`: `"expert"` (default) | `"default"` | etc.
+- `ref_file_ids`: array of file IDs returned after upload; remembered at the session level, so subsequent `edit_message` calls need not repeat them
+- `preempt`: preemption mode (not currently used by the web client), default false
+- **Response**: `text/event-stream` SSE stream
 
-### SSE 事件格式
+### SSE Event Format
 
-**1. `ready` — 会话就绪**
+**1. `ready` — session ready**
 
 ```
 event: ready
 data: {"request_message_id":1,"response_message_id":2,"model_type":"expert"}
 ```
 
-`ready` 后通常紧跟 `event: update_session`，这是正常的会话更新时间，不要误认为流结束。
+A `ready` event is usually immediately followed by `event: update_session`; this is a normal session update and should not be mistaken for the end of the stream.
 
-**2. `update_session` — 会话更新**
+**2. `update_session` — session update**
 
 ```
 event: update_session
 data: {"updated_at":1775386361.526172}
 ```
 
-**3. 增量内容 — 操作符格式**
+**3. Incremental content — operator format**
 
-所有增量更新使用统一的数据格式，通过 `"p"`（路径）和 `"o"`（操作符）组合：
+All incremental updates use a unified data format combining `"p"` (path) and `"o"` (operator):
 
-| 格式 | 示例 |
+| Format | Example |
 |------|------|
-| `"p"` 路径 + `"v"` 值 | `{"p":"response/status","v":"FINISHED"}` |
-| `"p"` + `"o":"APPEND"` + `"v"` 值 | `{"p":"response/fragments/-1/content","o":"APPEND","v":"，"}` |
-| `"p"` + `"o":"SET"` + `"v"` 值 | `{"p":"response/fragments/-1/elapsed_secs","o":"SET","v":0.95}` |
-| `"p"` + `"o":"BATCH"` + `"v"` 数组 | `{"p":"response","o":"BATCH","v":[{"p":"accumulated_token_usage","v":41},{"p":"quasi_status","v":"FINISHED"}]}` |
-| 纯 `"v"` 值 | `{"v":"用户"}`（继续追加到上一 `"p"` 路径）|
-| 完整 JSON 对象（初始快照） | `{"v":{"response":{"message_id":2,"fragments":[...]}}}` |
+| `"p"` path + `"v"` value | `{"p":"response/status","v":"FINISHED"}` |
+| `"p"` + `"o":"APPEND"` + `"v"` value | `{"p":"response/fragments/-1/content","o":"APPEND","v":","}` |
+| `"p"` + `"o":"SET"` + `"v"` value | `{"p":"response/fragments/-1/elapsed_secs","o":"SET","v":0.95}` |
+| `"p"` + `"o":"BATCH"` + `"v"` array | `{"p":"response","o":"BATCH","v":[{"p":"accumulated_token_usage","v":41},{"p":"quasi_status","v":"FINISHED"}]}` |
+| bare `"v"` value | `{"v":"User"}` (continue appending to the previous `"p"` path) |
+| full JSON object (initial snapshot) | `{"v":{"response":{"message_id":2,"fragments":[...]}}}` |
 
-### Delta 解析算法
+### Delta Parsing Algorithm
 
-来自 DeepSeek 前端源码的完整 delta 解析逻辑：
+Complete delta parsing logic from the DeepSeek frontend source:
 
 ```javascript
 class DeltaParser {
     constructor() {
-        this.op = "SET";   // 默认操作符
-        this.path = "";    // 默认路径
+        this.op = "SET";   // default operator
+        this.path = "";    // default path
     }
 
     parse(event) {
-        // path/op 跨事件持久化：后续事件可省略 p/o 字段
+        // path/op persists across events: subsequent events may omit p/o
         let op  = this.op  = event.o ?? this.op;
         let path = this.path = event.p ?? this.path;
 
-        // 非 BATCH：返回单条操作
+        // non-BATCH: return a single operation
         if (op !== "BATCH")
             return [{ path, op, value: event.v }];
 
-        // BATCH：分解数组中的每一项
+        // BATCH: decompose each item in the array
         let subParser = new DeltaParser;
         let results = [];
         for (let item of event.v) {
@@ -296,58 +296,58 @@ class DeltaParser {
 }
 ```
 
-**关键规则**：
+**Key rules**:
 
-| 规则 | 说明 |
+| Rule | Description |
 |------|------|
-| `p` 和 `o` 跨事件持久化 | 后续事件可省略 `p`/`o`，沿用上一事件的值 |
-| `o` 默认值为 `"SET"` | 无 `o` 字段的事件使用 SET 语义 |
-| `APPEND` 对字符串 = `+=` | 纯增量追加 |
-| `BATCH` 递归分解 | 子项 `p` 前置父路径 |
-| 操作类型只有 3 种 | `SET`（替换）、`APPEND`（追加）、`BATCH`（批量） |
+| `p` and `o` persist across events | subsequent events may omit `p`/`o`, inheriting the previous event's values |
+| `o` defaults to `"SET"` | events without an `o` field use SET semantics |
+| `APPEND` on strings = `+=` | pure incremental append |
+| `BATCH` recursively decomposed | child `p` is prefixed with the parent path |
+| only 3 operation types | `SET` (replace), `APPEND` (append), `BATCH` (batch) |
 
-**状态更新引擎逻辑**:
+**State update engine logic**:
 
 ```javascript
 switch (op) {
 case "SET":
-    target[resolvePath(lastPart)] = value;  // 直接赋值
+    target[resolvePath(lastPart)] = value;  // direct assignment
     break;
 case "APPEND":
     if (typeof value === "string")
-        target[resolvePath(lastPart)] += value;  // 字符串拼接
+        target[resolvePath(lastPart)] += value;  // string concatenation
     else if (Array.isArray(value))
-        // 数组合并（push 或 splice 到负索引位置）
+        // array merge (push or splice to a negative index position)
     break;
 }
 ```
 
-### SSE 流状态路径
+### SSE Stream State Paths
 
-| 路径/字段 | 说明 |
+| Path/Field | Description |
 |-----------|------|
-| `response/fragments/-1/content` | 最后一个 fragment 的内容 |
-| `response/fragments/-1/elapsed_secs` | 思考/搜索耗时（秒），仅 THINK 类型 |
-| `response/fragments/-1/status` | fragment 状态 `WIP` → `FINISHED` |
-| `response/fragments/-{n}/status` | 负索引标记任意 fragment 完成 |
-| `response/conversation_mode` | 会话模式：`"DEFAULT"` 或 `"DEEP_SEARCH"` |
-| `response/has_pending_fragment` | 后台有 fragment 处理中时为 true |
-| `response/search_status` | `"SEARCHING"` → `"FINISHED"` |
-| `response/accumulated_token_usage` | token 用量累计 |
-| `response/quasi_status` | BATCH 内结束信号：`"FINISHED"` 或 `"INCOMPLETE"` |
-| `response/status` | 主状态 `WIP` → `FINISHED` 或 `INCOMPLETE` |
+| `response/fragments/-1/content` | content of the last fragment |
+| `response/fragments/-1/elapsed_secs` | thinking/search elapsed time (seconds), THINK type only |
+| `response/fragments/-1/status` | fragment status `WIP` -> `FINISHED` |
+| `response/fragments/-{n}/status` | negative index marks any fragment as complete |
+| `response/conversation_mode` | conversation mode: `"DEFAULT"` or `"DEEP_SEARCH"` |
+| `response/has_pending_fragment` | true when a fragment is being processed in the background |
+| `response/search_status` | `"SEARCHING"` -> `"FINISHED"` |
+| `response/accumulated_token_usage` | cumulative token usage |
+| `response/quasi_status` | end signal within BATCH: `"FINISHED"` or `"INCOMPLETE"` |
+| `response/status` | primary status `WIP` -> `FINISHED` or `INCOMPLETE` |
 
-### Fragment 结构
+### Fragment Structure
 
 ```typescript
 {
   id: number,
   type: "THINK" | "RESPONSE"
-      | "TOOL_SEARCH"            // 搜索查询（含 queries + results）
-      | "TOOL_OPEN"              // 打开链接（含 result + reference）
-      | "TIP",                   // 提示条（含 style + hide_on_wip）
+      | "TOOL_SEARCH"            // search query (with queries + results)
+      | "TOOL_OPEN"              // open link (with result + reference)
+      | "TIP",                   // tip bar (with style + hide_on_wip)
   content: string | null,
-  elapsed_secs?: number,         // THINK 类型：思考耗时
+  elapsed_secs?: number,         // THINK type: thinking elapsed time
   status?: "WIP" | "FINISHED",
   queries?: Array<{ query: string }>,
   results?: Array<{ url: string, title: string, snippet: string, ... }>,
@@ -360,59 +360,59 @@ case "APPEND":
 }
 ```
 
-### 思考内容 vs 实际输出
+### Thinking Content vs Actual Output
 
-通过 `fragments[].type` 字段区分：
-
-```
-type == "THINK"     → 思考内容（仅 thinking=ON 时出现）
-type == "RESPONSE"  → 实际输出内容
-```
-
-### 流阶段顺序（thinking=ON, search=ON）
+Differentiated by the `fragments[].type` field:
 
 ```
- 1. SNAPSHOT    → 初始快照，fragments[0].type="THINK"
- 2. THINKING    → content APPEND 追加思考内容
- 3. THINK END   → elapsed_secs SET
- 4. TOOL_SEARCH → APPEND TOOL_SEARCH fragment
- 5. SEARCH      → results SET（大量结果）
- 6. SEARCH END  → status="FINISHED"
- 7. THINK(2)    → APPEND 新 THINK fragment（评估搜索结果）
- 8. TOOL_OPEN   → APPEND 多个 TOOL_OPEN fragment
- 9. OPEN END    → status="FINISHED"（批量标记）
-10. THINK(3)    → APPEND 新 THINK fragment（整理信息）
-11. RESPONSE    → APPEND RESPONSE fragment
-12. CONTENT     → content APPEND 追加输出
-13. REFERENCE   → BATCH 注入引用标记 [reference:N]
-14. TIP         → APPEND TIP fragment
-15. BATCH       → accumulated_token_usage + quasi_status="FINISHED"
-16. DONE        → status="FINISHED"
+type == "THINK"     -> thinking content (appears only when thinking=ON)
+type == "RESPONSE"  -> actual output content
 ```
 
-### 流阶段顺序（thinking=OFF, search=OFF）
+### Stream Stage Order (thinking=ON, search=ON)
 
 ```
-1. SNAPSHOT    → 初始快照，fragments[0].type="RESPONSE"
-2. CONTENT     → content APPEND
-3. BATCH       → accumulated_token_usage + quasi_status="FINISHED"
-4. DONE        → status="FINISHED"
+ 1. SNAPSHOT    -> initial snapshot, fragments[0].type="THINK"
+ 2. THINKING    -> content APPEND accumulates thinking content
+ 3. THINK END   -> elapsed_secs SET
+ 4. TOOL_SEARCH -> APPEND TOOL_SEARCH fragment
+ 5. SEARCH      -> results SET (large number of results)
+ 6. SEARCH END  -> status="FINISHED"
+ 7. THINK(2)    -> APPEND new THINK fragment (evaluating search results)
+ 8. TOOL_OPEN   -> APPEND multiple TOOL_OPEN fragments
+ 9. OPEN END    -> status="FINISHED" (bulk mark)
+10. THINK(3)    -> APPEND new THINK fragment (consolidating information)
+11. RESPONSE    -> APPEND RESPONSE fragment
+12. CONTENT     -> content APPEND accumulates output
+13. REFERENCE   -> BATCH injects reference markers [reference:N]
+14. TIP         -> APPEND TIP fragment
+15. BATCH       -> accumulated_token_usage + quasi_status="FINISHED"
+16. DONE        -> status="FINISHED"
 ```
 
-### `hint` — 服务端提示/错误
+### Stream Stage Order (thinking=OFF, search=OFF)
+
+```
+1. SNAPSHOT    -> initial snapshot, fragments[0].type="RESPONSE"
+2. CONTENT     -> content APPEND
+3. BATCH       -> accumulated_token_usage + quasi_status="FINISHED"
+4. DONE        -> status="FINISHED"
+```
+
+### `hint` — Server-Side Hint/Error
 
 ```
 event: hint
 data: {"type":"error","content":"Content is too long. Please shorten it and try again.","clear_response":true,"finish_reason":"input_exceeds_limit"}
 ```
 
-- `type`: `"error"` 表示错误提示，其他值可忽略
-- `finish_reason`: `"input_exceeds_limit"`（输入超长）、`"rate_limit_reached"`（限流）等
-- hint 事件通常出现在 `ready` 后不久，流处理器应在收到 hint 后主动终止
+- `type`: `"error"` indicates an error hint; other values can be ignored
+- `finish_reason`: `"input_exceeds_limit"` (input too long), `"rate_limit_reached"` (rate limited), etc.
+- The hint event typically appears shortly after `ready`; the stream processor should proactively terminate upon receiving a hint.
 
-### 流结束序列
+### Stream End Sequence
 
-**正常完成**:
+**Normal completion**:
 ```
 data: {"p":"response","o":"BATCH","v":[{"p":"accumulated_token_usage","v":139},{"p":"quasi_status","v":"FINISHED"}]}
 data: {"p":"response/status","o":"SET","v":"FINISHED"}
@@ -421,27 +421,27 @@ event: update_session
 data: {"updated_at":1778639258.866693}
 
 event: title
-data: {"content":"Rust所有权概念解释"}
+data: {"content":"Rust Ownership Concepts Explained"}
 
 event: close
 data: {"click_behavior":"none","auto_resume":false}
 ```
 
-**手动中断**:
+**Manual interrupt**:
 ```
 data: {"p":"response","o":"BATCH","v":[{"p":"accumulated_token_usage","v":39},{"p":"quasi_status","v":"INCOMPLETE"}]}
 data: {"p":"response/status","v":"INCOMPLETE"}
 ```
 
-**最可靠的结束信号是 `response/status` 变为 `FINISHED` 或 `INCOMPLETE`。**
+**The most reliable end signal is `response/status` changing to `FINISHED` or `INCOMPLETE`.**
 
 ---
 
-## 5. 编辑消息 edit_message
+## 5. Edit Message
 
 - **URL**: `POST /api/v0/chat/edit_message`
-- **请求头**: `Authorization`, `User-Agent`, `X-Ds-Pow-Response`
-- **请求体**:
+- **Headers**: `Authorization`, `User-Agent`, `X-Ds-Pow-Response`
+- **Request body**:
 
 ```json
 {
@@ -453,18 +453,18 @@ data: {"p":"response/status","v":"INCOMPLETE"}
 }
 ```
 
-- **注意**: `model_type` 和 `ref_file_ids` 不在 payload 中——二者在首次 completion 时传入后由 session 级别记忆，后续 edit_message 继承
-- `message_id`: 必须已存在（空 session 的 `message_id=1` 会返回 `biz_code=26, "invalid message id"`）
-- 编辑后生成新的 `message_id`，需从 SSE `ready` 事件中获取 `response_message_id` 用于后续 `stop_stream`
-- **Response**: 同 `completion`（SSE 流）
+- **Note**: `model_type` and `ref_file_ids` are not in the payload — both are passed in the first completion and remembered at the session level; subsequent edit_message calls inherit them.
+- `message_id`: must already exist (passing `message_id=1` for an empty session returns `biz_code=26, "invalid message id"`)
+- Editing generates a new `message_id`; obtain `response_message_id` from the SSE `ready` event for use in subsequent `stop_stream` calls.
+- **Response**: same as `completion` (SSE stream)
 
 ---
 
-## 6. 停止流 stop_stream
+## 6. Stop Stream
 
 - **URL**: `POST /api/v0/chat/stop_stream`
-- **请求头**: `Authorization`, `User-Agent`
-- **请求体**:
+- **Headers**: `Authorization`, `User-Agent`
+- **Request body**:
 
 ```json
 {
@@ -473,24 +473,24 @@ data: {"p":"response/status","v":"INCOMPLETE"}
 }
 ```
 
-- `chat_session_id`: 来自 create 端点的 session ID
-- `message_id`: 要取消的响应消息 ID。编辑请求的 `message_id=1` 对应响应 `message_id=2`
-- **不需要 PoW header**
-- **作用**: 取消正在进行的流式输出。客户端断开连接后调用此端点可让 DeepSeek 侧停止继续生成。
+- `chat_session_id`: the session ID from the create endpoint
+- `message_id`: the response message ID to cancel. An edit request with `message_id=1` corresponds to response `message_id=2`.
+- **PoW header is not required**
+- **Purpose**: cancels the ongoing streaming output. Calling this endpoint after the client disconnects tells the DeepSeek side to stop further generation.
 
-**响应**:
+**Response**:
 ```json
 {"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":null}}
 ```
 
 ---
 
-## 7. 删除会话 delete_session
+## 7. Delete Session
 
 - **URL**: `POST /api/v0/chat_session/delete`
-- **请求头**: `Authorization`, `User-Agent`
-- **请求体**: `{"chat_session_id": "<session_id>"}`
-- **响应**:
+- **Headers**: `Authorization`, `User-Agent`
+- **Request body**: `{"chat_session_id": "<session_id>"}`
+- **Response**:
 
 ```json
 {"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":null}}
@@ -498,11 +498,11 @@ data: {"p":"response/status","v":"INCOMPLETE"}
 
 ---
 
-## 8. 更新标题 update_title
+## 8. Update Title
 
 - **URL**: `POST /api/v0/chat_session/update_title`
-- **请求头**: `Authorization`, `User-Agent`
-- **请求体**:
+- **Headers**: `Authorization`, `User-Agent`
+- **Request body**:
 
 ```json
 {
@@ -511,7 +511,7 @@ data: {"p":"response/status","v":"INCOMPLETE"}
 }
 ```
 
-- **响应**:
+- **Response**:
 
 ```json
 {
@@ -527,22 +527,22 @@ data: {"p":"response/status","v":"INCOMPLETE"}
 }
 ```
 
-- **错误码**: `biz_code=5` → `EMPTY_CHAT_SESSION`（空 session 无法设置标题）；`biz_code=1` → `ILLEGAL_CHAT_SESSION_ID`
+- **Error codes**: `biz_code=5` -> `EMPTY_CHAT_SESSION` (empty session cannot have a title set); `biz_code=1` -> `ILLEGAL_CHAT_SESSION_ID`
 
 ---
 
-## 9. 上传文件 upload_file
+## 9. Upload File
 
 - **URL**: `POST /api/v0/file/upload_file`
-- **请求头**: `Authorization`, `User-Agent`, `X-Ds-Pow-Response`（target_path 为 `/api/v0/file/upload_file`）
-- **请求体**: `multipart/form-data`，字段名 `file`
+- **Headers**: `Authorization`, `User-Agent`, `X-Ds-Pow-Response` (target_path is `/api/v0/file/upload_file`)
+- **Request body**: `multipart/form-data`, field name `file`
 
 ```
 Content-Disposition: form-data; name="file"; filename="test.txt"
 Content-Type: text/plain
 ```
 
-- **响应**:
+- **Response**:
 
 ```json
 {
@@ -568,17 +568,17 @@ Content-Type: text/plain
 }
 ```
 
-- 关键字段: `data.biz_data.id`（后续 completion 的 `ref_file_ids` 使用）
-- 上传后 `status` 为 `PENDING`，需轮询 `fetch_files` 直到 `status=SUCCESS`
-- 状态流转: `PENDING` → `PARSING` → `SUCCESS`（或 `FAILED`）
+- Key field: `data.biz_data.id` (used in subsequent completion's `ref_file_ids`)
+- After upload, `status` is `PENDING`; poll `fetch_files` until `status=SUCCESS`.
+- Status flow: `PENDING` -> `PARSING` -> `SUCCESS` (or `FAILED`)
 
 ---
 
-## 10. 查询文件状态 fetch_files
+## 10. Fetch File Status
 
 - **URL**: `GET /api/v0/file/fetch_files?file_ids=<id>`
-- **请求头**: `Authorization`, `User-Agent`
-- **响应**:
+- **Headers**: `Authorization`, `User-Agent`
+- **Response**:
 
 ```json
 {
@@ -608,23 +608,23 @@ Content-Type: text/plain
 }
 ```
 
-- 关键字段: `files[].status` → `SUCCESS` 表示上传完成
-- 状态流转: `PENDING` → `PARSING` → `SUCCESS`
-- `model_kind`: `"NORMAL"`（文本/PDF）或 `"VISION"`（图片）
-- `token_usage`: 文件解析消耗的 token 数（SUCCESS 后才有值）
+- Key field: `files[].status` -> `SUCCESS` indicates the upload is complete
+- Status flow: `PENDING` -> `PARSING` -> `SUCCESS`
+- `model_kind`: `"NORMAL"` (text/PDF) or `"VISION"` (image)
+- `token_usage`: number of tokens consumed by file parsing (only available after SUCCESS)
 
 ---
 
-## WASM 故障处理
+## WASM Failure Handling
 
-若 DeepSeek 更新了 WASM 文件导致 PoW 计算失败：
+If DeepSeek updates the WASM file and PoW calculation fails:
 
-1. `PowSolver` 使用动态导出探测（不硬编码 `__wbindgen_export_0`），自动适配大部分 WASM 变更
-2. 如仍失败，更新配置中的 `wasm_url` 指向新的 WASM 文件 URL
-3. 参见 `ds_core/src/accounts/pow.rs` 中的动态探测逻辑
+1. `PowSolver` uses dynamic export probing (without hard-coding `__wbindgen_export_0`), automatically adapting to most WASM changes
+2. If it still fails, update `wasm_url` in the config to point to the new WASM file URL
+3. See the dynamic probing logic in `ds_core/src/accounts/pow.rs`
 
-## WAF 绕过
+## WAF Bypass
 
-- US IP 被 DeepSeek CloudFront WAF 拦截（HTTP 202 / x-amzn-waf-action）
-- 配置非 US 代理即可绕过：`[proxy] url = "http://127.0.0.1:7890"`
-- `wreq` 使用 BoringSSL 自动模拟 Chrome 136 TLS 指纹
+- US IP addresses are blocked by the DeepSeek CloudFront WAF (HTTP 202 / x-amzn-waf-action)
+- Configure a non-US proxy to bypass: `[proxy] url = "http://127.0.0.1:7890"`
+- `wreq` uses BoringSSL to automatically emulate the Chrome 136 TLS fingerprint

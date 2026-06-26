@@ -1,8 +1,8 @@
-//! OpenAI 响应转换 —— 将 StreamEvent 流映射为 OpenAI 响应格式
+//! OpenAI response conversion -- map a StreamEvent stream to OpenAI response format
 //!
-//! 数据流：converter -> tool_parser -> repair -> stop_detect
-//! - 仅 THINK / RESPONSE 片段映射到用户可见文本
-//! - obfuscation 在最终 SSE 序列化阶段动态注入
+//! Data flow: converter -> tool_parser -> repair -> stop_detect
+//! - Only THINK / RESPONSE fragments are mapped to user-visible text
+//! - obfuscation is dynamically injected during the final SSE serialization stage
 
 mod converter;
 mod tool_parser;
@@ -77,11 +77,11 @@ fn find_stop_pos(content: &str, stop: &[String]) -> Option<usize> {
     stop.iter().filter_map(|s| content.find(s)).min()
 }
 
-/// RepairStream 内部使用的流类型
+/// Stream type used internally by RepairStream
 type ChunkStream =
     Pin<Box<dyn Stream<Item = Result<ChatCompletionsResponseChunk, OpenAIAdapterError>> + Send>>;
 
-/// 工具调用修复闭包类型
+/// Tool call repair closure type
 pub(crate) type RepairFn = Arc<
     dyn Fn(
             String,
@@ -91,7 +91,7 @@ pub(crate) type RepairFn = Arc<
         + Sync,
 >;
 
-/// 执行 tool_calls 修复：将 StreamEvent 流中的 ContentDelta 提取为结构化 ToolCall
+/// Execute tool_calls repair: extract ContentDelta events from the StreamEvent stream into structured ToolCall objects
 pub(crate) async fn execute_tool_repair(
     stream: Pin<Box<dyn Stream<Item = Result<StreamEvent, ds_core::CoreError>> + Send>>,
     tag_config: &TagConfig,
@@ -106,7 +106,7 @@ pub(crate) async fn execute_tool_repair(
                 text.push_str(&content);
                 if text.len() > tool_parser::MAX_XML_BUF_LEN {
                     return Err(OpenAIAdapterError::Internal(
-                        "修复模型输出过长，放弃修复".into(),
+                        "repair model output too long, aborting repair".into(),
                     ));
                 }
             }
@@ -128,15 +128,15 @@ pub(crate) async fn execute_tool_repair(
 
     let (calls, _) = tool_parser::parse_tool_calls_with(&wrapped, tag_config).ok_or_else(|| {
         OpenAIAdapterError::Internal(format!(
-            "修复模型返回无法解析为工具调用: {}",
+            "repair model returned output that cannot be parsed as tool calls: {}",
             &text[..text.len().min(200)]
         ))
     })?;
 
-    // 修复模型可能返回空结果，提前检查
+    // repair model may return an empty result -- check early
     let trimmed = text.trim();
     if trimmed == "[]" || trimmed == "{}" {
-        return Err(OpenAIAdapterError::Internal("修复模型返回空结果".into()));
+        return Err(OpenAIAdapterError::Internal("repair model returned empty result".into()));
     }
     Ok(calls)
 }
@@ -151,11 +151,11 @@ enum RepairState {
 }
 
 pin_project! {
-    /// 工具调用修复流：在 ToolCallStream 之后、StopDetectStream 之前
+    /// Tool call repair stream: sits between ToolCallStream and StopDetectStream.
     ///
-    /// 当 ToolCallStream 返回 Err(ToolCallRepairNeeded) 时，
-    /// 丢弃上游流（释放账号），通过 repair_fn 发起修复请求，
-    /// 将修复后的 tool_calls 发送给客户端。
+    /// When ToolCallStream returns Err(ToolCallRepairNeeded), this stream drops
+    /// the upstream (releasing the account), issues a repair request via repair_fn,
+    /// and forwards the repaired tool_calls to the client.
     struct RepairStream {
         #[pin]
         inner: Option<ChunkStream>,
@@ -199,7 +199,7 @@ impl Stream for RepairStream {
                         ))))) => {
                             warn!(
                                 target: "adapter",
-                                "RepairStream 捕获修复请求: len={}",
+                                "RepairStream caught repair request: len={}",
                                 tool_text.len()
                             );
                             trace!(target: "adapter", ">>> repair: accepting tool_text len={}", tool_text.len());
@@ -229,7 +229,7 @@ impl Stream for RepairStream {
                     Poll::Ready(Ok(calls)) => {
                         info!(
                             target: "adapter",
-                            "tool_calls 修复成功: {} 个工具调用",
+                            "tool_calls repair succeeded: {} tool call(s)",
                             calls.len()
                         );
                         trace!(target: "adapter", ">>> repair: success {} calls", calls.len());
@@ -244,13 +244,13 @@ impl Stream for RepairStream {
                         ))));
                     }
                     Poll::Ready(Err(e)) => {
-                        warn!(target: "adapter", "tool_calls 修复失败: {}", e);
-                        *this.state = RepairState::RepairFailed(format!("修复失败: {}", e));
+                        warn!(target: "adapter", "tool_calls repair failed: {}", e);
+                        *this.state = RepairState::RepairFailed(format!("repair failed: {}", e));
                         continue;
                     }
                     Poll::Pending => {
                         if this.keepalive_deadline.as_mut().poll(cx).is_ready() {
-                            trace!(target: "adapter", ">>> keepalive(repair): 发送空工具增量");
+                            trace!(target: "adapter", ">>> keepalive(repair): sending empty tool delta");
                             this.keepalive_deadline
                                 .as_mut()
                                 .reset(tokio::time::Instant::now() + KEEPALIVE_INTERVAL);
@@ -326,7 +326,7 @@ where
                         if chunk.choices.is_empty() && chunk.usage.is_some() {
                             return Poll::Ready(Some(Ok(chunk)));
                         }
-                        // 允许 finish_reason 从 stop 升级为 tool_calls
+                        // allow finish_reason to be upgraded from stop to tool_calls
                         if let Some(choice) = chunk.choices.first_mut()
                             && choice.delta.content.is_none()
                             && choice.delta.reasoning_content.is_none()
@@ -379,7 +379,7 @@ where
     }
 }
 
-/// 流式响应参数（减少 stream() 参数个数）
+/// Streaming response parameters (reduces the number of arguments to stream())
 pub(crate) struct StreamCfg {
     pub include_usage: bool,
     pub include_obfuscation: bool,
@@ -389,14 +389,14 @@ pub(crate) struct StreamCfg {
     pub tag_config: Arc<TagConfig>,
 }
 
-/// 流式响应：把 StreamEvent 流转换为 ChatCompletionsResponseChunk 流
+/// Streaming response: converts a StreamEvent stream into a ChatCompletionsResponseChunk stream
 pub(crate) fn stream<S>(ds_stream: S, model: String, cfg: StreamCfg) -> ChunkStream
 where
     S: Stream<Item = Result<StreamEvent, ds_core::CoreError>> + Send + 'static,
 {
     debug!(
         target: "adapter",
-        "构建流式响应: model={}, include_usage={}, include_obfuscation={}, stop_count={}, repair={}",
+        "building streaming response: model={}, include_usage={}, include_obfuscation={}, stop_count={}, repair={}",
         model, cfg.include_usage, cfg.include_obfuscation, cfg.stop.len(), cfg.repair_fn.is_some()
     );
     let converted = converter::ConverterStream::new(
@@ -430,12 +430,12 @@ where
     Box::pin(stop_detect)
 }
 
-/// 非流式响应：stream() 的下游收集器，纯重组无特殊逻辑
+/// Non-streaming response: downstream collector for stream(), pure reassembly with no special logic.
 ///
-/// 始终保持为 stream() 的流式收集和重组：
-/// - 所有核心处理（修复、转换、停止序列）都在 stream() 中完成
-/// - 本函数仅将 stream() 的输出事件聚合并重组成单条 ChatCompletionsResponse JSON
-/// - 不要在此函数中添加任何独立于 stream() 的处理逻辑
+/// Always delegates to stream() for streaming collection and reassembly:
+/// - All core processing (repair, conversion, stop sequences) is done inside stream()
+/// - This function only aggregates stream() output events and reassembles them into a single ChatCompletionsResponse JSON
+/// - Do not add any processing logic here that is independent of stream()
 pub(crate) async fn aggregate<S>(
     ds_stream: S,
     model: String,
@@ -444,7 +444,7 @@ pub(crate) async fn aggregate<S>(
 where
     S: Stream<Item = Result<StreamEvent, ds_core::CoreError>> + Send + 'static,
 {
-    debug!(target: "adapter", "构建非流式响应: model={}, stop_count={}", model, cfg.stop.len());
+    debug!(target: "adapter", "building non-streaming response: model={}, stop_count={}", model, cfg.stop.len());
     let chunk_stream = stream(
         ds_stream,
         model.clone(),
@@ -510,7 +510,7 @@ where
     let message_content = if content.is_empty() && !has_tool_calls {
         warn!(
             target: "adapter",
-            "聚合响应内容为空: model={}, finish_reason={:?}, has_tool_calls={}, usage={:?}",
+            "aggregated response content is empty: model={}, finish_reason={:?}, has_tool_calls={}, usage={:?}",
             model, finish_reason, tool_calls.is_some(), usage
         );
         None
@@ -550,7 +550,7 @@ where
 
     debug!(
         target: "adapter",
-        "非流式响应聚合完成: finish_reason={:?}, has_tool_calls={}, usage={:?}",
+        "non-streaming response aggregation complete: finish_reason={:?}, has_tool_calls={}, usage={:?}",
         completion.choices[0].finish_reason,
         completion.choices[0].message.tool_calls.is_some(),
         completion.usage
@@ -853,8 +853,8 @@ mod tests {
 
     #[tokio::test]
     async fn stream_fragmented_tool_calls_with_thinking() {
-        let tool_xml = tool_span(r#"[{"name": "get_weather", "arguments": {"city": "北京"}}]"#);
-        let events = make_full_stream(&[("思考中", "THINK"), (&tool_xml, "RESPONSE")], None);
+        let tool_xml = tool_span(r#"[{"name": "get_weather", "arguments": {"city": "beijing"}}]"#);
+        let events = make_full_stream(&[("thinking in progress", "THINK"), (&tool_xml, "RESPONSE")], None);
         let stream = futures::stream::iter(events);
         let chunks = collect_chunks(to_bytes_stream(super::stream(
             stream,
@@ -875,7 +875,7 @@ mod tests {
             .iter()
             .filter_map(|c| c["choices"][0]["delta"]["reasoning_content"].as_str())
             .collect();
-        assert!(all_reasoning.contains("思考中"), "should contain 思考中");
+        assert!(all_reasoning.contains("thinking in progress"), "should contain thinking in progress");
         let has_tool_calls = chunks
             .iter()
             .any(|c| c["choices"][0]["delta"]["tool_calls"].as_array().is_some());
@@ -889,7 +889,7 @@ mod tests {
             .unwrap();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0]["function"]["name"], "get_weather");
-        assert_eq!(calls[0]["function"]["arguments"], r#"{"city":"北京"}"#);
+        assert_eq!(calls[0]["function"]["arguments"], r#"{"city":"beijing"}"#);
         assert_eq!(
             chunks.last().unwrap()["choices"][0]["finish_reason"],
             "tool_calls"
@@ -903,7 +903,7 @@ mod tests {
         );
         let events = make_full_stream(
             &[
-                ("好的，我来帮你用豆包生成图片。", "RESPONSE"),
+                ("Sure, let me generate an image with Doubao.", "RESPONSE"),
                 (&tool_xml, "RESPONSE"),
             ],
             None,
@@ -929,7 +929,7 @@ mod tests {
             .filter_map(|c| c["choices"][0]["delta"]["content"].as_str())
             .collect();
         assert!(
-            all_content.contains("好的，我来帮你用豆包生成图片"),
+            all_content.contains("Sure, let me generate an image with Doubao"),
             "should contain leading text, got {all_content:?}"
         );
         let has_tool_calls = chunks
@@ -1025,7 +1025,7 @@ mod tests {
     #[tokio::test]
     async fn stream_include_obfuscation() {
         let events = make_full_stream(
-            &[("这是一段足够长的中文文本用于测试混淆", "RESPONSE")],
+            &[("this is a sufficiently long text string for testing obfuscation", "RESPONSE")],
             None,
         );
         let stream = futures::stream::iter(events);
@@ -1064,7 +1064,7 @@ mod tests {
             .filter_map(|c| c["choices"][0]["delta"]["content"].as_str())
             .collect();
         assert!(
-            all_content.contains("足够长的中文文本"),
+            all_content.contains("sufficiently long text string"),
             "should contain expected text, got {all_content:?}"
         );
         assert_eq!(
@@ -1077,7 +1077,7 @@ mod tests {
     async fn aggregate_tool_calls_with_leading_text() {
         let tool_xml = tool_span(r#"[{"name": "get_weather", "arguments": {"city": "beijing"}}]"#);
         let events = make_full_stream(
-            &[("好的，我来帮你。", "RESPONSE"), (&tool_xml, "RESPONSE")],
+            &[("Sure, I can help.", "RESPONSE"), (&tool_xml, "RESPONSE")],
             None,
         );
         let stream = futures::stream::iter(events);
@@ -1096,7 +1096,7 @@ mod tests {
         .await
         .unwrap();
         let msg = &resp.choices[0].message;
-        assert_eq!(msg.content.as_deref(), Some("好的，我来帮你。"));
+        assert_eq!(msg.content.as_deref(), Some("Sure, I can help."));
         let calls = msg.tool_calls.as_ref().unwrap();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].function.as_ref().unwrap().name, "get_weather");
@@ -1111,7 +1111,7 @@ mod tests {
     async fn aggregate_tool_calls_multi_chunk_fragments() {
         let tool_xml = tool_span(r#"[{"name": "f", "arguments": {}}]"#);
         let events = make_full_stream(
-            &[("让我来查一下。", "RESPONSE"), (&tool_xml, "RESPONSE")],
+            &[("Let me look that up.", "RESPONSE"), (&tool_xml, "RESPONSE")],
             None,
         );
         let stream = futures::stream::iter(events);
@@ -1141,8 +1141,8 @@ mod tests {
         let tool_xml = tool_span(r#"[{"name": "get_weather", "arguments": {"city": "beijing"}}]"#);
         let events = make_full_stream(
             &[
-                ("用户要查天气，我需要调用工具", "THINK"),
-                ("好的，我来帮你查一下。", "RESPONSE"),
+                ("The user wants to check the weather, I need to call a tool", "THINK"),
+                ("Sure, let me check that for you.", "RESPONSE"),
                 (&tool_xml, "RESPONSE"),
             ],
             None,
@@ -1172,7 +1172,7 @@ mod tests {
     #[tokio::test]
     async fn stream_tool_calls_json_split_right_after_tag() {
         let tool_xml = tool_span(r#"[{"name": "f", "arguments": {}}]"#);
-        let events = make_full_stream(&[("好的。", "RESPONSE"), (&tool_xml, "RESPONSE")], None);
+        let events = make_full_stream(&[("Sure.", "RESPONSE"), (&tool_xml, "RESPONSE")], None);
         let stream = futures::stream::iter(events);
         let chunks = collect_chunks(to_bytes_stream(super::stream(
             stream,

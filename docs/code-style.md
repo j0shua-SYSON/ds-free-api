@@ -1,75 +1,75 @@
-# 代码风格规范
+# Code Style Conventions
 
-## 注释风格
+## Comment Style
 
-### 模块文档（//!）
-- 第一行：模块职责 —— 具体描述
-- 空行后：关键设计决策或限制
+### Module Documentation (//!)
+- First line: module responsibility — concrete description
+- After blank line: key design decisions or constraints
 
 ```rust
-//! 账号池管理 —— 多账号负载均衡
+//! Account pool management — multi-account load balancing
 //!
 //! 1 account = 1 session = 1 concurrency
 ```
 
-### 公有 API 文档（///）
-- 使用动词开头："返回"、"创建"、"发送"
-- 明确副作用："自动释放"、"清理 session"
-- 标注 Panic 条件（如有）
+### Public API Documentation (///)
+- Use verb-led sentences: "Returns", "Creates", "Sends"
+- State side effects explicitly: "auto-releases", "cleans up session"
+- Document Panic conditions (if any)
 
 ```rust
-/// 轮询获取一个空闲账号
+/// Polls for a free account.
 ///
-/// 返回的 AccountGuard 在 Drop 时自动释放 busy 标记
+/// The returned AccountGuard automatically releases the busy flag on Drop.
 pub fn get_account(&self) -> Option<AccountGuard>
 ```
 
-### 行内注释（//）
-- 解释"为什么"而非"做什么"
-- 标注临时方案或外部依赖
+### Inline Comments (//)
+- Explain "why", not "what"
+- Note workarounds or external dependencies
 
 ```rust
-// 顺序很重要：health_check 必须在 update_title 之前，
-// 否则空 session 会导致 EMPTY_CHAT_SESSION 错误
+// Order matters: health_check must come before update_title,
+// otherwise an empty session will cause EMPTY_CHAT_SESSION errors
 ```
 
-## 命名规范
+## Naming Conventions
 
-| 类型 | 风格 | 示例 |
-|------|------|------|
-| 模块/文件 | snake_case | `ds_core`, `accounts.rs` |
-| 类型/结构体 | PascalCase | `AccountPool`, `CoreError` |
-| 函数/方法 | snake_case | `get_account()`, `compute_pow()` |
-| 常量 | SCREAMING_SNAKE_CASE | `ENDPOINT_USERS_LOGIN` |
-| 枚举变体 | PascalCase | `AllAccountsFailed` |
+| Type | Style | Example |
+|------|-------|---------|
+| Module/file | snake_case | `ds_core`, `accounts.rs` |
+| Type/struct | PascalCase | `AccountPool`, `CoreError` |
+| Function/method | snake_case | `get_account()`, `compute_pow()` |
+| Constant | SCREAMING_SNAKE_CASE | `ENDPOINT_USERS_LOGIN` |
+| Enum variant | PascalCase | `AllAccountsFailed` |
 
-## 错误消息
+## Error Messages
 
-- **中文**：配置验证、账号管理等面向用户的错误消息使用中文
-- **英文**：内部库错误（`ds_core`、`client`、`adapter`、`anthropic_compat`）使用英文，供开发者调试
-- 包含上下文："账号 {} 初始化失败"
-- 避免泄露敏感信息（token 只打印前8位）
-- 服务器层的 `ServerError::Display` 向 API 客户端展示错误时，保持适配器原始消息不变
+- **Chinese**: user-facing error messages (config validation, account management, etc.) are in Chinese
+- **English**: internal library errors (`ds_core`, `client`, `adapter`, `anthropic_compat`) are in English for developer debugging
+- Include context: "Account {} initialization failed"
+- Avoid leaking sensitive data (tokens: print only the first 8 characters)
+- The server-layer `ServerError::Display` passes the adapter's original error message to API clients unchanged
 
-## 枚举变体命名
+## Enum Variant Naming
 
-- 所有枚举变体使用 PascalCase（如 `AllAccountsFailed`、`BadRequest`）
-- 仅在 serde 序列化时通过 `#[serde(rename = "...")]` 使用非 PascalCase
+- All enum variants use PascalCase (e.g. `AllAccountsFailed`, `BadRequest`)
+- Use non-PascalCase only for serde serialization via `#[serde(rename = "...")]`
 
-## 日志规范
+## Logging Specification
 
-见 `docs/logging-spec.md`
+See `docs/logging-spec.md`
 
-## 导入分组
+## Import Grouping
 
-1. 标准库 (`std::`)
-2. 第三方库 (`tokio::`, `wreq::`)
-3. 内部模块 (`crate::`)
-4. 本地 use (super, self)
+1. Standard library (`std::`)
+2. Third-party crates (`tokio::`, `wreq::`)
+3. Internal modules (`crate::`)
+4. Local use (super, self)
 
-组间空行分隔。
+Separate groups with blank lines.
 
-## 测试代码规范
+## Test Code Conventions
 
-- 测试函数内部允许使用 `println!` 输出中间结果，便于失败时观测解析内容
-- 库代码（`src/` 非 `#[cfg(test)]` 区域）仍禁止直接使用 `println!` / `eprintln!`
+- `println!` is allowed inside test functions to print intermediate results for debugging failures
+- Library code (non-`#[cfg(test)]` areas in `src/`) still prohibits direct use of `println!` / `eprintln!`

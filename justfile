@@ -3,7 +3,7 @@
 set positional-arguments
 
 # Run all checks: type check, lint, format, audit, unused deps
-# 前置: cargo install cargo-audit && cargo install cargo-machete && cargo install cargo-outdated
+# Prerequisites: cargo install cargo-audit && cargo install cargo-machete && cargo install cargo-outdated
 check:
   cargo fmt --check      
   cargo check            
@@ -19,7 +19,7 @@ check-web:
 
 
 # Run unified protocol debug CLI (replaces ds-core-cli / openai-adapter-cli)
-# 默认使用 py-e2e-tests/config.toml，可通过 -c <path> 覆盖
+# Defaults to py-e2e-tests/config.toml; override with -c <path>
 adapter-cli *ARGS:
   cargo run --example adapter_cli -- -c py-e2e-tests/config.toml "$@"
 
@@ -31,23 +31,23 @@ test-adapter-request *ARGS:
 test-adapter-response *ARGS:
   cargo test openai_adapter::response -- "$@"
 
-# Run HTTP server（自动构建最新前端 -> 启动后端）
+# Run HTTP server (builds latest frontend then starts backend)
 serve *ARGS:
   (cd web && bun run build) && cargo run -- "$@"
 
-# Basic: 基础功能测试（两端点）
+# Basic: core feature tests (both endpoints)
 e2e-basic *ARGS:
   cd py-e2e-tests && uv run python runner.py scenarios/basic "$@"
 
-# Repair: 工具调用损坏修复专项测试
+# Repair: tool call malformed-format repair tests
 e2e-repair *ARGS:
   cd py-e2e-tests && uv run python runner.py scenarios/repair "$@"
 
-# Stress: 多迭代并发压测（basic + repair 全部场景）
+# Stress: multi-iteration concurrent stress test (all basic + repair scenarios)
 e2e-stress *ARGS:
   cd py-e2e-tests && uv run python stress_runner.py "$@"
 
-# Oversized: 长上下文回退方案测试（expert 分块 + default/vision 文件上传）
+# Oversized: long-context fallback test (expert chunked + default/vision file upload)
 e2e-oversized *ARGS:
   cd py-e2e-tests && uv run python test_oversized.py "$@"
 

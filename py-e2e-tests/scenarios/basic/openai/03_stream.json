@@ -1,5 +1,5 @@
 {
-  "name": "流式对话",
+  "name": "Streaming chat",
   "endpoint": "openai",
   "category": "basic",
   "models": ["deepseek-default"],

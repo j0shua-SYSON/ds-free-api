@@ -1,5 +1,5 @@
 {
-  "name": "图片内联上传",
+  "name": "Image inline upload",
   "endpoint": "openai",
   "category": "basic",
   "models": [

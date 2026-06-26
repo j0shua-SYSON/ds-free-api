@@ -1,5 +1,5 @@
 {
-  "name": "JSON-name和arguments互换",
+  "name": "JSON - name and arguments swapped",
   "endpoint": "openai",
   "category": "repair",
   "models": ["deepseek-default", "deepseek-expert"],

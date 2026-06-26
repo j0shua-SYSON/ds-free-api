@@ -1,5 +1,5 @@
 {
-  "name": "文档base64上传",
+  "name": "Document base64 upload",
   "endpoint": "anthropic",
   "category": "basic",
   "models": [

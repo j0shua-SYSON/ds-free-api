@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""压测入口 —— 多迭代并发，跑 basic/ + repair/ 全部场景
+"""Stress test entry point -- multi-iteration concurrency across all basic/ + repair/ scenarios
 
-安全并发数 = max(1, 账号数 / 2)，stress 默认 = 安全并发数 + 1
+Safe concurrency = max(1, account count / 2); stress default = safe concurrency + 1
 """
 
 import argparse
@@ -27,16 +27,16 @@ def main():
     api_key = config["api_key"]
     stress_parallel = safe + 1
 
-    parser = argparse.ArgumentParser(description="端到端压测")
-    parser.add_argument("--iterations", type=int, default=3, help="每场景迭代数 (默认: 3)")
-    parser.add_argument("--parallel", type=int, default=stress_parallel, help=f"并行数 (默认: {stress_parallel})")
-    parser.add_argument("--models", type=str, nargs="*", default=None, help="模型过滤")
-    parser.add_argument("--filter", type=str, nargs="*", default=None, help="场景名称关键字过滤（多个用空格分隔）")
-    parser.add_argument("--report", type=str, default=None, help="输出 JSON 报告路径")
-    parser.add_argument("--show-output", action="store_true", help="显示模型输出内容")
+    parser = argparse.ArgumentParser(description="End-to-end stress test")
+    parser.add_argument("--iterations", type=int, default=3, help="iterations per scenario (default: 3)")
+    parser.add_argument("--parallel", type=int, default=stress_parallel, help=f"parallelism (default: {stress_parallel})")
+    parser.add_argument("--models", type=str, nargs="*", default=None, help="model filter")
+    parser.add_argument("--filter", type=str, nargs="*", default=None, help="scenario name keyword filter (multiple values separated by spaces)")
+    parser.add_argument("--report", type=str, default=None, help="output JSON report path")
+    parser.add_argument("--show-output", action="store_true", help="display model output content")
     args = parser.parse_args()
 
-    # 加载全部场景
+    # load all scenarios
     basic_oai = load_scenarios("scenarios/basic", "openai", args.filter)
     basic_anth = load_scenarios("scenarios/basic", "anthropic", args.filter)
     repair_sc = load_scenarios("scenarios/repair", None, args.filter)
@@ -55,12 +55,12 @@ def main():
     total_scenarios = len(all_scenarios)
     total_requests = total_scenarios * len(models) * args.iterations
 
-    print(f"\n端到端压测")
-    print(f"  场景: {total_scenarios} 个 (basic + repair)")
-    print(f"  模型: {', '.join(models)}")
-    print(f"  迭代: {args.iterations} 次/场景/模型")
-    print(f"  并行: {args.parallel}")
-    print(f"  总计: {total_requests} 次请求\n")
+    print(f"\nEnd-to-end stress test")
+    print(f"  Scenarios: {total_scenarios} (basic + repair)")
+    print(f"  Models: {', '.join(models)}")
+    print(f"  Iterations: {args.iterations} per scenario per model")
+    print(f"  Parallel: {args.parallel}")
+    print(f"  Total: {total_requests} requests\n")
 
     tasks: list[tuple[str, str, dict, int]] = []
     for model in models:
@@ -107,9 +107,9 @@ def main():
                 _print_output(result)
 
     total_duration = time.time() - start_total
-    print(f"\n  总耗时: {format_duration(total_duration)}")
+    print(f"\n  Total duration: {format_duration(total_duration)}")
 
-    report = print_report(all_results, "端到端压测报告", args.parallel)
+    report = print_report(all_results, "End-to-end stress test report", args.parallel)
     report["total_duration"] = round(total_duration, 1)
 
     if args.report:
@@ -126,7 +126,7 @@ def main():
                 "summary": report,
                 "results": all_results,
             }, f, ensure_ascii=False, indent=2)
-        print(f"  报告已输出: {args.report}")
+        print(f"  Report written to: {args.report}")
 
     sys.exit(0 if report["failed"] == 0 else 1)
 

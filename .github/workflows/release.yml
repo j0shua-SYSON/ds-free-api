@@ -79,7 +79,7 @@ jobs:
           name="ds-free-api-${{ steps.meta.outputs.tag }}-${{ matrix.suffix }}"
           mkdir -p "$name"
           cp "target/${{ matrix.target }}/release/ds-free-api" "$name/"
-          cp LICENSE README.md README.en.md config.example.toml "$name/"
+          cp LICENSE README.md config.example.toml "$name/"
           tar czf "$name.tar.gz" "$name"
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -154,7 +154,7 @@ jobs:
           name="ds-free-api-${{ steps.meta.outputs.tag }}-${{ matrix.suffix }}"
           mkdir -p "$name"
           cp "target/${{ matrix.target }}/release/ds-free-api" "$name/"
-          cp LICENSE README.md README.en.md config.example.toml "$name/"
+          cp LICENSE README.md config.example.toml "$name/"
           tar czf "$name.tar.gz" "$name"
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -204,7 +204,7 @@ jobs:
           name="ds-free-api-${{ steps.meta.outputs.tag }}-${{ matrix.suffix }}"
           mkdir -p "$name"
           cp "target/${{ matrix.target }}/release/ds-free-api" "$name/"
-          cp LICENSE README.md README.en.md config.example.toml "$name/"
+          cp LICENSE README.md config.example.toml "$name/"
           tar czf "$name.tar.gz" "$name"
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -260,7 +260,7 @@ jobs:
           $name = "ds-free-api-${{ steps.meta.outputs.tag }}-${{ matrix.suffix }}"
           New-Item -ItemType Directory -Force -Path $name
           Copy-Item "target/${{ matrix.target }}/release/ds-free-api.exe" "$name/"
-          Copy-Item LICENSE, README.md, README.en.md, config.example.toml "$name/"
+          Copy-Item LICENSE, README.md, config.example.toml "$name/"
           Compress-Archive -Path $name -DestinationPath "$name.zip"
       - name: Upload artifact
         uses: actions/upload-artifact@v7

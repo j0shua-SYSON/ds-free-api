@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""长上下文回退方案测试 —— 验证 oversized 检测 + 分块逻辑
+"""Oversized context fallback test -- verifies oversized detection + chunking logic
 
-构造超阈值长文本分别测试 expert（分块 completion）和 default（文件上传）两种回退路径。
+Constructs prompts that exceed the threshold to test both fallback paths:
+expert (chunked completion) and default (file upload).
 
-用法：
+Usage:
   uv run python test_oversized.py
-  uv run python test_oversized.py --model deepseek-expert   # 只测 expert
+  uv run python test_oversized.py --model deepseek-expert   # test expert only
   uv run python test_oversized.py --show-output
   uv run python test_oversized.py --model deepseek-expert --show-output
 """
@@ -23,7 +24,7 @@ from config import load_config
 
 
 def make_long_prompt(target_chars: int) -> str:
-    """构造一个刚好超 threshold 的长文本 prompt
+    """Build a long prompt that just exceeds the threshold.
     """
     base = "deepseek"
     repeat = target_chars // len(base) + 1
@@ -31,7 +32,7 @@ def make_long_prompt(target_chars: int) -> str:
 
 
 def run_oversized(client: OpenAI, model: str, threshold: int) -> dict:
-    """执行一次 oversized 测试"""
+    """Run a single oversized test."""
     prompt = make_long_prompt(threshold + 1)
 
     start = time.time()
@@ -66,7 +67,7 @@ def run_oversized(client: OpenAI, model: str, threshold: int) -> dict:
         result["output_preview"] = "".join(content_parts)[:200]
         result["passed"] = len(content_parts) > 0
         if not result["passed"]:
-            result["error"] = "返回内容为空"
+            result["error"] = "response content is empty"
 
     except Exception as e:
         result["duration"] = time.time() - start
@@ -76,12 +77,12 @@ def run_oversized(client: OpenAI, model: str, threshold: int) -> dict:
 
 
 def _print_output(result: dict) -> None:
-    """打印模型输出内容（与 runner.py 对称）"""
+    """Print model output content (mirrors runner.py)."""
     content = (result.get("output_preview") or "")[:300].replace("\n", "\\n")
     if content:
-        print(f"    ├ 回复: {content}")
+        print(f"    ├ Reply: {content}")
     if result.get("error"):
-        print(f"    └ 错误: {result['error']}")
+        print(f"    └ Error: {result['error']}")
 
 
 def format_duration(seconds: float) -> str:
@@ -91,26 +92,26 @@ def format_duration(seconds: float) -> str:
 
 
 def print_report(results: list[dict]) -> dict:
-    """打印汇总报告（与 runner.py 对称）"""
+    """Print summary report (mirrors runner.py)."""
     total = len(results)
     passed = sum(1 for r in results if r["passed"])
     duration = sum(r["duration"] for r in results)
 
     print(f"\n{'=' * 60}")
-    print(f"  长上下文回退方案测试")
-    print(f"  时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"  Oversized context fallback test")
+    print(f"  Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'=' * 60}")
-    print(f"  总计: {total}  |  通过: {passed}  |  失败: {total - passed}  |  总耗时: {format_duration(duration)}")
+    print(f"  Total: {total}  |  Passed: {passed}  |  Failed: {total - passed}  |  Duration: {format_duration(duration)}")
 
     for r in sorted(results, key=lambda x: x["model"]):
         status = "✓" if r["passed"] else "✗"
-        fallback = "分块 completion" if "expert" in r["model"] else "文件上传"
+        fallback = "chunked completion" if "expert" in r["model"] else "file upload"
         err = f" | {r['error'][:60]}" if r["error"] else ""
         print(f"    {status} {r['model']} | {fallback} | threshold={r['threshold']} | {r['duration']:6.2f}s | {r['output_len']} chars{err}")
 
     if total - passed > 0:
         print(f"\n  {'─' * 48}")
-        print(f"  失败详情:")
+        print(f"  Failure details:")
         for r in results:
             if not r["passed"]:
                 print(f"  {r['model']}: {r['error']}")
@@ -120,10 +121,10 @@ def print_report(results: list[dict]) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="长上下文回退方案测试")
-    parser.add_argument("--model", type=str, default=None, help="只测试指定模型，如 deepseek-expert")
-    parser.add_argument("--show-output", action="store_true", help="显示模型输出内容")
-    parser.add_argument("--report", type=str, default=None, help="输出 JSON 报告路径")
+    parser = argparse.ArgumentParser(description="Oversized context fallback test")
+    parser.add_argument("--model", type=str, default=None, help="test only the specified model, e.g. deepseek-expert")
+    parser.add_argument("--show-output", action="store_true", help="display model output content")
+    parser.add_argument("--report", type=str, default=None, help="output JSON report path")
     args = parser.parse_args()
 
     config = load_config()
@@ -132,7 +133,7 @@ def main():
         api_key=config["api_key"],
     )
 
-    # 从 config 动态构建阈值表
+    # build threshold table dynamically from config
     threshold_map = {
         f"deepseek-{t}": (limit * 75 // 100)
         for t, limit in zip(config["model_types"], config["input_character_limits"])
@@ -140,13 +141,13 @@ def main():
 
     models = [args.model] if args.model else config["models"]
 
-    suite_name = "长上下文回退方案测试"
+    suite_name = "Oversized context fallback test"
     print(f"\n{suite_name}")
-    print(f"  模型: {', '.join(models)}")
+    print(f"  Models: {', '.join(models)}")
 
-    # 先测 expert（分块），再测 default/vision（文件上传）
+    # test expert (chunked) first, then default/vision (file upload)
     sorted_models = sorted(models, key=lambda m: (0 if "expert" in m else 1, m))
-    fallback_labels = {"expert": "分块 completion", "default": "文件上传", "vision": "文件上传"}
+    fallback_labels = {"expert": "chunked completion", "default": "file upload", "vision": "file upload"}
 
     results: list[dict] = []
     done = 0
@@ -174,7 +175,7 @@ def main():
                 "summary": report,
                 "results": results,
             }, f, ensure_ascii=False, indent=2)
-        print(f"  报告已输出: {args.report}")
+        print(f"  Report written to: {args.report}")
 
     sys.exit(0 if report["failed"] == 0 else 1)
 

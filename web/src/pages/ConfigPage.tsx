@@ -125,7 +125,7 @@ export function ConfigPage() {
         setConfig(fresh);
       }
     } catch (e: unknown) {
-      setMessage({ type: 'err', text: `保存失败: ${e instanceof Error ? e.message : e}` });
+      setMessage({ type: 'err', text: `Save failed: ${e instanceof Error ? e.message : e}` });
     } finally {
       setSaving(false);
     }
@@ -573,7 +573,7 @@ export function ConfigPage() {
               ))}
               <Input
                 className="w-48 h-8 text-xs"
-                placeholder="新标签，回车添加"
+                placeholder="New tag, press Enter to add"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && e.currentTarget.value.trim()) {
                     update(['ds_core', 'tool_call', 'extra_starts'], [
@@ -604,7 +604,7 @@ export function ConfigPage() {
               ))}
               <Input
                 className="w-48 h-8 text-xs"
-                placeholder="新标签，回车添加"
+                placeholder="New tag, press Enter to add"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && e.currentTarget.value.trim()) {
                     update(['ds_core', 'tool_call', 'extra_ends'], [
