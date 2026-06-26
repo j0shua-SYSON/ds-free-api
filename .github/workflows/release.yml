@@ -365,8 +365,8 @@ jobs:
         with:
           path: dist
 
-      - name: Remove frontend artifact from release
-        run: rm -rf dist/web-dist
+      - name: Remove non-binary artifacts from release
+        run: rm -rf dist/web-dist dist/*.dockerbuild
 
       - name: Flatten structure
         run: |
