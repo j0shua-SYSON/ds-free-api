@@ -225,7 +225,9 @@ pub async fn setup_admin(
         .await
         .map_err(|e| format!("save failed: {}", e))?;
 
-    sign_jwt(store).await.ok_or_else(|| "JWT issuance failed".into())
+    sign_jwt(store)
+        .await
+        .ok_or_else(|| "JWT issuance failed".into())
 }
 
 /// Password login; returns a JWT token
@@ -247,7 +249,9 @@ pub async fn login_admin(
 
     if store.verify_password(password).await {
         limiter.record_success();
-        sign_jwt(store).await.ok_or_else(|| "JWT issuance failed".into())
+        sign_jwt(store)
+            .await
+            .ok_or_else(|| "JWT issuance failed".into())
     } else {
         limiter.record_failure();
         Err("incorrect password".into())

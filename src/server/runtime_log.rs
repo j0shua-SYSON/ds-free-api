@@ -199,7 +199,9 @@ pub fn init(log_path: &str) {
     };
 
     let logger = Arc::new(DualLogger::new(log_path, max_level));
-    GLOBAL_LOGGER.set(logger.clone()).expect("logger already initialized");
+    GLOBAL_LOGGER
+        .set(logger.clone())
+        .expect("logger already initialized");
 
     // Arc::into_inner requires a reference count of 1, but GLOBAL_LOGGER holds one
     // so we wrap an Arc clone in Box::new

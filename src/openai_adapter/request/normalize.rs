@@ -36,10 +36,7 @@ pub(crate) fn apply(req: &ChatCompletionsRequest) -> Result<NormalizedParams, St
                 ));
             }
             "function" if msg.name.is_none() => {
-                return Err(format!(
-                    "messages[{}] role 'function' requires 'name'",
-                    i
-                ));
+                return Err(format!("messages[{}] role 'function' requires 'name'", i));
             }
             _ => {}
         }

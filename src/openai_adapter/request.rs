@@ -341,7 +341,10 @@ mod tests {
             "tool_choice": "required"
         });
         let req = parse_json(body).unwrap();
-        assert!(req.prompt.contains("**Note: you must call one or more tools.**"));
+        assert!(
+            req.prompt
+                .contains("**Note: you must call one or more tools.**")
+        );
     }
 
     #[test]
@@ -355,7 +358,10 @@ mod tests {
             "parallel_tool_calls": false
         });
         let req = parse_json(body).unwrap();
-        assert!(req.prompt.contains("**Note: only one tool may be called at a time.**"));
+        assert!(
+            req.prompt
+                .contains("**Note: only one tool may be called at a time.**")
+        );
     }
 
     #[test]
@@ -369,7 +375,10 @@ mod tests {
             "tool_choice": { "type": "function", "function": { "name": "get_weather" } }
         });
         let req = parse_json(body).unwrap();
-        assert!(req.prompt.contains("**Note: you must call the 'get_weather' tool.**"));
+        assert!(
+            req.prompt
+                .contains("**Note: you must call the 'get_weather' tool.**")
+        );
     }
 
     #[test]
@@ -396,7 +405,10 @@ mod tests {
             req.prompt
                 .contains("you may only choose from the following allowed tools: get_weather")
         );
-        assert!(req.prompt.contains("**Note: you must call one or more tools.**"));
+        assert!(
+            req.prompt
+                .contains("**Note: you must call one or more tools.**")
+        );
     }
 
     #[test]
@@ -414,7 +426,10 @@ mod tests {
         });
         let req = parse_json(body).unwrap();
         assert!(req.prompt.contains("**my_custom** (custom):"));
-        assert!(req.prompt.contains("**Note: you must call the 'my_custom' custom tool.**"));
+        assert!(
+            req.prompt
+                .contains("**Note: you must call the 'my_custom' custom tool.**")
+        );
     }
 
     #[test]
@@ -567,7 +582,10 @@ mod tests {
             "function_call": { "name": "get_weather" }
         });
         let req = parse_json(body).unwrap();
-        assert!(req.prompt.contains("**Note: you must call the 'get_weather' tool.**"));
+        assert!(
+            req.prompt
+                .contains("**Note: you must call the 'get_weather' tool.**")
+        );
     }
 
     #[test]

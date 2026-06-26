@@ -270,7 +270,9 @@ impl Config {
                 if let Some(path) = iter.next() {
                     config_path = Some(path);
                 } else {
-                    return Err(ConfigError::Cli("-c flag requires a path argument".to_string()));
+                    return Err(ConfigError::Cli(
+                        "-c flag requires a path argument".to_string(),
+                    ));
                 }
             }
         }
@@ -319,7 +321,9 @@ impl Config {
     /// Validate configuration
     pub(crate) fn validate(&self) -> Result<(), ConfigError> {
         if self.ds_core.model_types.is_empty() {
-            return Err(ConfigError::Validation("model_types must not be empty".to_string()));
+            return Err(ConfigError::Validation(
+                "model_types must not be empty".to_string(),
+            ));
         }
         let n = self.ds_core.model_types.len();
         if self.ds_core.max_input_tokens.len() != n {

@@ -171,7 +171,12 @@ pub(crate) async fn admin_setup(
 ) -> Response {
     let req: SetupRequest = match serde_json::from_slice(&body) {
         Ok(r) => r,
-        Err(e) => return error_response(StatusCode::BAD_REQUEST, &format!("invalid request format: {}", e)),
+        Err(e) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                &format!("invalid request format: {}", e),
+            );
+        }
     };
 
     match super::auth::setup_admin(&state.store, &state.login_limiter, &req.password).await {
@@ -197,7 +202,12 @@ pub(crate) async fn admin_login(
 ) -> Response {
     let req: LoginRequest = match serde_json::from_slice(&body) {
         Ok(r) => r,
-        Err(e) => return error_response(StatusCode::BAD_REQUEST, &format!("invalid request format: {}", e)),
+        Err(e) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                &format!("invalid request format: {}", e),
+            );
+        }
     };
 
     match super::auth::login_admin(&state.store, &state.login_limiter, &req.password).await {
@@ -262,7 +272,12 @@ pub(crate) async fn admin_put_config(
 ) -> Response {
     let mut new_config: Config = match serde_json::from_slice(&body) {
         Ok(c) => c,
-        Err(e) => return error_response(StatusCode::BAD_REQUEST, &format!("JSON parse failed: {}", e)),
+        Err(e) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                &format!("JSON parse failed: {}", e),
+            );
+        }
     };
 
     // Validate

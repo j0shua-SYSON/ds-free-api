@@ -107,19 +107,25 @@ fn validate_tool_choice(tc: &ToolChoice, tools: Option<&[Tool]>) -> Result<(), S
             if matches!(mode.as_str(), "auto" | "required")
                 && tools.map(|t| t.is_empty()).unwrap_or(true)
             {
-                return Err("tools must be provided when tool_choice is 'auto' or 'required'".into());
+                return Err(
+                    "tools must be provided when tool_choice is 'auto' or 'required'".into(),
+                );
             }
             Ok(())
         }
         ToolChoice::Named(_) | ToolChoice::Custom(_) => {
             if tools.is_none() {
-                return Err("tools must be provided when tool_choice specifies a named tool".into());
+                return Err(
+                    "tools must be provided when tool_choice specifies a named tool".into(),
+                );
             }
             Ok(())
         }
         ToolChoice::AllowedTools(AllowedToolsChoice { allowed_tools, .. }) => {
             if tools.is_none() {
-                return Err("tools must be provided when tool_choice specifies allowed_tools".into());
+                return Err(
+                    "tools must be provided when tool_choice specifies allowed_tools".into(),
+                );
             }
             if !matches!(allowed_tools.mode.as_str(), "auto" | "required") {
                 return Err(format!(
@@ -156,15 +162,17 @@ fn format_tool(tool: &Tool, idx: usize) -> Result<String, String> {
     match tool.ty.as_str() {
         "function" => {
             let func = tool.function.as_ref().ok_or_else(|| {
-                format!("tools[{}] type 'function' requires a function definition", idx)
+                format!(
+                    "tools[{}] type 'function' requires a function definition",
+                    idx
+                )
             })?;
             format_function(func)
         }
         "custom" => {
-            let custom = tool
-                .custom
-                .as_ref()
-                .ok_or_else(|| format!("tools[{}] type 'custom' requires a custom definition", idx))?;
+            let custom = tool.custom.as_ref().ok_or_else(|| {
+                format!("tools[{}] type 'custom' requires a custom definition", idx)
+            })?;
             Ok(format_custom(custom))
         }
         _ => Err(format!("tools[{}] unsupported type: {}", idx, tool.ty)),
@@ -219,7 +227,9 @@ fn build_tool_instruction_block(req: &ChatCompletionsRequest) -> String {
         "3. **Stop immediately** after outputting `{TOOL_CALL_END}` -- do not add any subsequent text, XML tags, or explanatory content."
     ));
     lines.push("4. Do not wrap tool calls inside a markdown code block.".into());
-    lines.push("5. String parameter values must be wrapped in **double quotes** (JSON standard).".into());
+    lines.push(
+        "5. String parameter values must be wrapped in **double quotes** (JSON standard).".into(),
+    );
     lines.push(format!(
         "6. When deciding to call a tool, the **first non-whitespace character** of the output must be `{TOOL_CALL_START}`."
     ));
@@ -265,7 +275,10 @@ fn build_tool_instruction_block(req: &ChatCompletionsRequest) -> String {
             .iter()
             .map(|n| format!("{{\"name\": \"{n}\", \"arguments\": {}}}", example_args(n)))
             .collect();
-        lines.push("**Example B** -- calling multiple tools at once (one array containing all calls):".into());
+        lines.push(
+            "**Example B** -- calling multiple tools at once (one array containing all calls):"
+                .into(),
+        );
         lines.push(String::new());
         lines.push(format!(
             "{TOOL_CALL_START}[{}]{TOOL_CALL_END}",
@@ -342,6 +355,10 @@ fn format_custom(custom: &CustomTool) -> String {
         "- **{}** (custom):\n  - call method: `{}`\n  - brief description: {}",
         custom.name,
         method,
-        if desc.is_empty() { "no description" } else { desc },
+        if desc.is_empty() {
+            "no description"
+        } else {
+            desc
+        },
     )
 }

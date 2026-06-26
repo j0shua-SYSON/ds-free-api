@@ -136,7 +136,9 @@ pub(crate) async fn execute_tool_repair(
     // repair model may return an empty result -- check early
     let trimmed = text.trim();
     if trimmed == "[]" || trimmed == "{}" {
-        return Err(OpenAIAdapterError::Internal("repair model returned empty result".into()));
+        return Err(OpenAIAdapterError::Internal(
+            "repair model returned empty result".into(),
+        ));
     }
     Ok(calls)
 }
@@ -854,7 +856,10 @@ mod tests {
     #[tokio::test]
     async fn stream_fragmented_tool_calls_with_thinking() {
         let tool_xml = tool_span(r#"[{"name": "get_weather", "arguments": {"city": "beijing"}}]"#);
-        let events = make_full_stream(&[("thinking in progress", "THINK"), (&tool_xml, "RESPONSE")], None);
+        let events = make_full_stream(
+            &[("thinking in progress", "THINK"), (&tool_xml, "RESPONSE")],
+            None,
+        );
         let stream = futures::stream::iter(events);
         let chunks = collect_chunks(to_bytes_stream(super::stream(
             stream,
@@ -875,7 +880,10 @@ mod tests {
             .iter()
             .filter_map(|c| c["choices"][0]["delta"]["reasoning_content"].as_str())
             .collect();
-        assert!(all_reasoning.contains("thinking in progress"), "should contain thinking in progress");
+        assert!(
+            all_reasoning.contains("thinking in progress"),
+            "should contain thinking in progress"
+        );
         let has_tool_calls = chunks
             .iter()
             .any(|c| c["choices"][0]["delta"]["tool_calls"].as_array().is_some());
@@ -1025,7 +1033,10 @@ mod tests {
     #[tokio::test]
     async fn stream_include_obfuscation() {
         let events = make_full_stream(
-            &[("this is a sufficiently long text string for testing obfuscation", "RESPONSE")],
+            &[(
+                "this is a sufficiently long text string for testing obfuscation",
+                "RESPONSE",
+            )],
             None,
         );
         let stream = futures::stream::iter(events);
@@ -1111,7 +1122,10 @@ mod tests {
     async fn aggregate_tool_calls_multi_chunk_fragments() {
         let tool_xml = tool_span(r#"[{"name": "f", "arguments": {}}]"#);
         let events = make_full_stream(
-            &[("Let me look that up.", "RESPONSE"), (&tool_xml, "RESPONSE")],
+            &[
+                ("Let me look that up.", "RESPONSE"),
+                (&tool_xml, "RESPONSE"),
+            ],
             None,
         );
         let stream = futures::stream::iter(events);
@@ -1141,7 +1155,10 @@ mod tests {
         let tool_xml = tool_span(r#"[{"name": "get_weather", "arguments": {"city": "beijing"}}]"#);
         let events = make_full_stream(
             &[
-                ("The user wants to check the weather, I need to call a tool", "THINK"),
+                (
+                    "The user wants to check the weather, I need to call a tool",
+                    "THINK",
+                ),
                 ("Sure, let me check that for you.", "RESPONSE"),
                 (&tool_xml, "RESPONSE"),
             ],

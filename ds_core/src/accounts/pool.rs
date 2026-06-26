@@ -432,7 +432,10 @@ impl AccountPool {
         if new_state == AccountState::Idle {
             Ok(())
         } else {
-            Err(format!("Re-login failed, current state: {}", new_state.as_str()))
+            Err(format!(
+                "Re-login failed, current state: {}",
+                new_state.as_str()
+            ))
         }
     }
 
@@ -611,12 +614,16 @@ async fn health_check(
             display_id,
             text.lines().find(|l| l.contains("biz_code")).unwrap_or(&text)
         );
-        return Err(PoolError::Validation("account abnormal (muted/limited)".into()));
+        return Err(PoolError::Validation(
+            "account abnormal (muted/limited)".into(),
+        ));
     }
 
     // Check whether the SSE stream ended normally
     if !text.contains(r#""FINISHED""#) && !text.contains(r#""INCOMPLETE""#) {
-        return Err(PoolError::Validation("SSE stream did not end normally".into()));
+        return Err(PoolError::Validation(
+            "SSE stream did not end normally".into(),
+        ));
     }
 
     debug!(
