@@ -261,13 +261,18 @@ impl DsClient {
         client_locale: String,
         proxy_url: Option<&str>,
     ) -> Self {
-        // Emulation profile is overridable via the DS_EMULATION env var (serde snake_case,
-        // e.g. "firefox_139", "chrome_137", "edge_134"). Some wreq emulations get their TLS
-        // handshake rejected by DeepSeek's CloudFront WAF; this allows switching without rebuilding.
-        let emulation = std::env::var("DS_EMULATION")
-            .ok()
-            .and_then(|s| serde_json::from_str::<Emulation>(&format!("\"{s}\"")).ok())
-            .unwrap_or(Emulation::Chrome136);
+        // Emulation profile is overridable via the DS_EMULATION env var so we can switch the
+        // TLS fingerprint without rebuilding (some wreq emulations get rejected by CloudFront).
+        let em_name = std::env::var("DS_EMULATION").unwrap_or_else(|_| "chrome_136".to_string());
+        let emulation = match em_name.as_str() {
+            "firefox_139" => Emulation::Firefox139,
+            "firefox_135" => Emulation::Firefox135,
+            "edge_134" => Emulation::Edge134,
+            "chrome_137" => Emulation::Chrome137,
+            "opera_119" => Emulation::Opera119,
+            _ => Emulation::Chrome136,
+        };
+        log::info!("ds_core: TLS emulation profile = {em_name}");
         let mut builder = wreq::Client::builder().emulation(emulation);
         if let Some(url) = proxy_url.and_then(|u| wreq::Proxy::all(u).ok()) {
             builder = builder.proxy(url);
