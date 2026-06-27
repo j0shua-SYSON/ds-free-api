@@ -261,34 +261,24 @@ impl DsClient {
         client_locale: String,
         proxy_url: Option<&str>,
     ) -> Self {
-        // Browser profile is overridable via DS_EMULATION; default Chrome136.
-        let em_name = std::env::var("DS_EMULATION").unwrap_or_else(|_| "chrome_136".to_string());
+        // Browser profile via DS_EMULATION. Default to an older Chrome (<=123) whose TLS
+        // ClientHello uses classical curves only (no X25519MLKEM768 post-quantum key share).
+        // The PQ key share bloats the hello past one packet and some networks reset the
+        // connection (the DeepSeek CloudFront path here). Newer profiles (chrome_136, etc.)
+        // remain selectable for comparison.
+        let em_name = std::env::var("DS_EMULATION").unwrap_or_else(|_| "chrome_119".to_string());
         let profile = match em_name.as_str() {
-            "firefox_139" => Emulation::Firefox139,
+            "chrome_136" => Emulation::Chrome136,
+            "chrome_123" => Emulation::Chrome123,
+            "chrome_120" => Emulation::Chrome120,
+            "chrome_116" => Emulation::Chrome116,
+            "chrome_100" => Emulation::Chrome100,
             "firefox_135" => Emulation::Firefox135,
             "edge_134" => Emulation::Edge134,
-            "chrome_137" => Emulation::Chrome137,
-            "opera_119" => Emulation::Opera119,
-            _ => Emulation::Chrome136,
+            _ => Emulation::Chrome119,
         };
-        // Strip the post-quantum key share (X25519MLKEM768) from the TLS ClientHello: it bloats
-        // the hello past a single packet and some networks reset the connection. Keep the rest of
-        // the browser TLS/HTTP2/header fingerprint intact. Set DS_KEEP_PQ=1 to keep PQ.
-        let mut emu: wreq::Emulation = profile.into();
-        let disable_pq = std::env::var("DS_KEEP_PQ").is_err();
-        if disable_pq {
-            if let Some(tls) = emu.tls_options.as_mut() {
-                tls.curves_list = Some("X25519:P-256:P-384".into());
-                tls.key_shares = None;
-            }
-        }
-        log::info!("ds_core: TLS emulation = {em_name}, post_quantum_disabled = {disable_pq}");
-        let mut builder = wreq::Client::builder()
-            .tls_options(emu.tls_options)
-            .http1_options(emu.http1_options)
-            .http2_options(emu.http2_options)
-            .default_headers(emu.headers)
-            .orig_headers(emu.orig_headers);
+        log::info!("ds_core: TLS emulation = {em_name}");
+        let mut builder = wreq::Client::builder().emulation(profile);
         if let Some(url) = proxy_url.and_then(|u| wreq::Proxy::all(u).ok()) {
             builder = builder.proxy(url);
         }
