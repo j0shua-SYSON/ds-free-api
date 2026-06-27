@@ -261,10 +261,9 @@ impl DsClient {
         client_locale: String,
         proxy_url: Option<&str>,
     ) -> Self {
-        // Emulation profile is overridable via the DS_EMULATION env var so we can switch the
-        // TLS fingerprint without rebuilding (some wreq emulations get rejected by CloudFront).
+        // Browser profile is overridable via DS_EMULATION; default Chrome136.
         let em_name = std::env::var("DS_EMULATION").unwrap_or_else(|_| "chrome_136".to_string());
-        let emulation = match em_name.as_str() {
+        let profile = match em_name.as_str() {
             "firefox_139" => Emulation::Firefox139,
             "firefox_135" => Emulation::Firefox135,
             "edge_134" => Emulation::Edge134,
@@ -272,8 +271,24 @@ impl DsClient {
             "opera_119" => Emulation::Opera119,
             _ => Emulation::Chrome136,
         };
-        log::info!("ds_core: TLS emulation profile = {em_name}");
-        let mut builder = wreq::Client::builder().emulation(emulation);
+        // Strip the post-quantum key share (X25519MLKEM768) from the TLS ClientHello: it bloats
+        // the hello past a single packet and some networks reset the connection. Keep the rest of
+        // the browser TLS/HTTP2/header fingerprint intact. Set DS_KEEP_PQ=1 to keep PQ.
+        let mut emu: wreq::Emulation = profile.into();
+        let disable_pq = std::env::var("DS_KEEP_PQ").is_err();
+        if disable_pq {
+            if let Some(tls) = emu.tls_options.as_mut() {
+                tls.curves_list = Some("X25519:P-256:P-384".into());
+                tls.key_shares = None;
+            }
+        }
+        log::info!("ds_core: TLS emulation = {em_name}, post_quantum_disabled = {disable_pq}");
+        let mut builder = wreq::Client::builder()
+            .tls_options(emu.tls_options)
+            .http1_options(emu.http1_options)
+            .http2_options(emu.http2_options)
+            .default_headers(emu.headers)
+            .orig_headers(emu.orig_headers);
         if let Some(url) = proxy_url.and_then(|u| wreq::Proxy::all(u).ok()) {
             builder = builder.proxy(url);
         }
