@@ -279,6 +279,29 @@ impl DsClient {
         };
         log::info!("ds_core: TLS emulation = {em_name}");
         let mut builder = wreq::Client::builder().emulation(profile);
+
+        // Trust the OS root store (Windows cert store, etc.) instead of only wreq's bundled
+        // public roots. This lets locally-installed CAs — e.g. an antivirus TLS-inspection CA
+        // like "ESET SSL Filter CA" — be trusted, so HTTPS still verifies on machines where AV
+        // intercepts TLS. Falls back to wreq's defaults if the OS store can't be read.
+        let native = rustls_native_certs::load_native_certs();
+        let cert_count = native.certs.len();
+        if cert_count > 0 {
+            let mut store_builder = wreq::tls::CertStore::builder();
+            for cert in &native.certs {
+                store_builder = store_builder.add_der_cert(cert);
+            }
+            match store_builder.build() {
+                Ok(store) => {
+                    builder = builder.cert_store(store);
+                    log::info!("ds_core: trusting {cert_count} OS root certs (incl. local CAs)");
+                }
+                Err(e) => log::warn!("ds_core: failed to build OS cert store: {e}; using defaults"),
+            }
+        } else {
+            log::warn!("ds_core: no OS root certs loaded; using wreq default roots");
+        }
+
         if let Some(url) = proxy_url.and_then(|u| wreq::Proxy::all(u).ok()) {
             builder = builder.proxy(url);
         }
